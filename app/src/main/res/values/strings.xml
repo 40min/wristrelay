@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">WristRelay</string>
+    <string name="listener_name">WristRelay notification access</string>
+</resources>

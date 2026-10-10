@@ -1,0 +1,25 @@
+# Decision history
+
+Recorded 2026-10-10 from the agreed planning discussion. These decisions describe the intended product; implementation status is tracked separately.
+
+| ID | Decision | Reason and consequence |
+|---|---|---|
+| ADR-001 | Use WristRelay as the project name | Describes a bridge to the wrist without binding the name to one source. No legal uniqueness claim is made. |
+| ADR-002 | One message = one independent notification | The user needs to browse all messages on the watch. Per-conversation updates/replacements would lose that behavior and are rejected. |
+| ADR-003 | Preserve Telegram phone notifications | Garmin Connect app filtering avoids duplicate watch forwarding without interfering with Telegram on Android. |
+| ADR-004 | Never deduplicate by text alone | Two identical texts can be two legitimate messages. Detection must consider identity and snapshot state. |
+| ADR-005 | Offline, no message persistence or telemetry | Notification access is sensitive. Minimize data handling, permissions and retention. |
+| ADR-006 | Single Kotlin/Compose module, manual wiring | Keep the initial utility small; introduce adapters without speculative module or DI infrastructure. |
+| ADR-007 | Hardware feasibility gate first | Watch grouping, retention and vibration cannot be proven by unit tests. Require ONE/TWO/THREE acceptance before production relay expansion. |
+| ADR-008 | Conservative, evidence-led cleanup | Telegram removal/replacement is not guaranteed read state. Avoid deleting unread watch entries prematurely. |
+| ADR-009 | Garmin Connect mirrors Android notifications | No direct Bluetooth or Garmin API integration is needed for the initial approach. |
+| ADR-010 | Apache-2.0 license | Use the license proposed in the agreed open-source plan. |
+| ADR-011 | Minimum API 29 remains provisional | Start at Android 10 and revisit only with compatibility evidence. |
+
+## Superseded proposals
+
+The earlier discussion considered updating one notification per conversation and testing both notification strategies. The later user decision supersedes those proposals: retain separate notifications for every message. The latest plan governs implementation.
+
+## Future changes
+
+Append a dated decision with evidence, alternatives, consequences and the superseded ID. Do not silently rewrite the product contract when a device limitation appears; record the limitation and reassess feasibility.
