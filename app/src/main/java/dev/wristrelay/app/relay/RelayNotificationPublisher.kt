@@ -10,22 +10,32 @@ import dev.wristrelay.app.model.RelayMessage
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
+ * Publication boundary for the relay pipeline so detection is testable
+ * without an Android NotificationManager; the only production
+ * implementation posts real notifications.
+ */
+fun interface RelayPublisher {
+    fun publish(messages: List<RelayMessage>)
+}
+
+/**
  * Publishes one independent Android notification per genuinely new message.
  *
  * Identities are unique per publication and never reused while entries are
  * untouched; there is no per-conversation update or replacement (ADR-002) and
  * source notifications are never modified or cancelled.
  *
- * The channel is NOT silent on purpose: Garmin Connect mirroring of
- * silent/no-sound notifications is unverified, and the 0.2 gate is watch
- * readability. If the phone must be quieter afterwards, silence becomes a
- * task 2.2 effort validated against watch forwarding.
+ * The channel is silent (IMPORTANCE_LOW, no sound): WristRelay entries are
+ * duplicated announcements of messages the phone already alerted for, and a
+ * second alert on the phone would be noise (task 2.2). Watch mirroring of
+ * silent notifications is a remaining device-validation item (2.2/3.1 in
+ * VALIDATION.md); vibration on the watch is not affected by channel sound.
  */
-class RelayNotificationPublisher(private val context: Context) {
+class RelayNotificationPublisher(private val context: Context) : RelayPublisher {
 
     private val nextNotificationId = AtomicInteger(FIRST_NOTIFICATION_ID)
 
-    fun publish(messages: List<RelayMessage>) {
+    override fun publish(messages: List<RelayMessage>) {
         if (messages.isEmpty()) return
         ensureChannel()
         val notificationManager = context.getSystemService(
@@ -69,10 +79,11 @@ class RelayNotificationPublisher(private val context: Context) {
             NotificationChannel(
                 CHANNEL_ID,
                 "Messages relayed to watch",
-                NotificationManager.IMPORTANCE_DEFAULT,
+                NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 setShowBadge(true)
                 setLockscreenVisibility(Notification.VISIBILITY_PUBLIC)
+                setSound(null, null)
             }
         )
     }
@@ -83,7 +94,7 @@ class RelayNotificationPublisher(private val context: Context) {
         /** Starts far above low ids to avoid any collision with system allocations. */
         private const val FIRST_NOTIFICATION_ID = 0x5252_0000
         private const val TAG_PREFIX = "wristrelay-msg-"
-        private const val CHANNEL_ID = "wristrelay.relayed_messages"
+        private const val CHANNEL_ID = "wristrelay.relayed_messages_silent"
         private const val FALLBACK_TITLE = "Message"
     }
 }

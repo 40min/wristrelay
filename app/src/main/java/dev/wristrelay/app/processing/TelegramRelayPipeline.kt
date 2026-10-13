@@ -1,15 +1,14 @@
 package dev.wristrelay.app.processing
 
 import dev.wristrelay.app.model.RelayMessage
-import dev.wristrelay.app.relay.RelayNotificationPublisher
+import dev.wristrelay.app.relay.RelayPublisher
 
 /**
- * Binds message detection to publication for one Telegram snapshot. One step
- * of the task 0.2 pipeline; grows into the production relay in Epic 2.
+ * Binds message detection to publication for one Telegram snapshot.
  */
 class TelegramRelayPipeline(
     private val tracker: MessageTracker,
-    private val publisher: RelayNotificationPublisher,
+    private val publisher: dev.wristrelay.app.relay.RelayPublisher,
 ) {
 
     fun run(conversationKey: String, snapshot: List<RelayMessage>?): RelayResult =
