@@ -23,12 +23,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     private val postingAllowed = mutableStateOf(false)
+    private val listenerAccessGranted = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +52,7 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = {
                             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         }) { Text("Open notification access settings") }
+                        Text("Notification access: " + if (listenerAccessGranted.value) "granted" else "not granted")
                         Text("Notification posting: " + if (postingAllowed.value) "allowed" else "not allowed")
                         if (Build.VERSION.SDK_INT >= 33 && !postingAllowed.value) {
                             Button(onClick = {
@@ -68,6 +71,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshPermission() {
+        listenerAccessGranted.value = NotificationManagerCompat.getEnabledListenerPackages(this)
+            .contains(packageName)
         postingAllowed.value = getSystemService(android.app.NotificationManager::class.java)
             .areNotificationsEnabled() && (Build.VERSION.SDK_INT < 33 ||
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)

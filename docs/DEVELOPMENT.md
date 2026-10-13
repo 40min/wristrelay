@@ -8,6 +8,8 @@ Use the committed Gradle wrapper, JDK 17+ and Android SDK platform 37.0. Set AND
 
 Android Lint is the initial static analysis gate. Detekt and richer Android test infrastructure remain foundation tasks. A successful no-source unit-test task does not mean parser or relay coverage exists.
 
+If `java` is not on `PATH`, set `JAVA_HOME` explicitly (verified with Corretto 24 via SDKMAN: `JAVA_HOME=~/.sdkman/candidates/java/current ./gradlew ...`).
+
 ## Working rules
 
 - Keep one app module and manual wiring until concrete complexity justifies more.
