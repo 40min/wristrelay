@@ -49,6 +49,7 @@ import dev.wristrelay.app.relay.RelayNotificationPublisher
 import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.settings.SettingsGate
 import dev.wristrelay.app.settings.SettingsStore
+import dev.wristrelay.app.ui.WristRelayTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -63,7 +64,7 @@ class MainActivity : ComponentActivity() {
             val permissionRequest = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()
             ) { refreshPermission() }
-            MaterialTheme {
+            WristRelayTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
@@ -71,54 +72,21 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text("WristRelay", style = MaterialTheme.typography.headlineLarge)
-                        Text("Relays each genuinely new Telegram message to its own " +
-                            "notification for Garmin Connect mirroring. " +
-                            "Telegram's phone notifications are never touched.")
+                        Text(
+                            "Shows every new Telegram message on your watch as its own " +
+                                "separate entry. Telegram's notifications on your phone are " +
+                                "never changed."
+                        )
 
-                    SettingsSection()
+                        SettingsSection()
 
                         PermissionControls(permissionRequest)
                         StatusLines()
                         TestRelayButton()
                         GarminGuide()
 
-                        Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
-                        Text("Sanitized notification metadata from external apps; no text content, " +
-                            "bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), " +
-                            "cleared when the app process dies.")
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = {
-                                captured.clear()
-                                captured.addAll(DebugEventStore.snapshot())
-                            }) { Text("Refresh") }
-                            OutlinedButton(onClick = {
-                                DebugEventStore.clear()
-                                captured.clear()
-                            }) { Text("Clear") }
-                            OutlinedButton(onClick = {
-                                val report = captured.joinToString("\n\n") { event ->
-                                    DebugFormat.format(event).joinToString("\n")
-                                }
-                                val clipboard = getSystemService(ClipboardManager::class.java)
-                                clipboard.setPrimaryClip(ClipData.newPlainText("wristrelay-debug", report))
-                            }) { Text("Copy all") }
-                        }
-                        captured.forEach { event ->
-                            val lines = DebugFormat.format(event)
-                            Column(
-                                modifier = Modifier.padding(start = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                lines.forEach { line ->
-                                    Text(
-                                        text = line,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        softWrap = false,
-                                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                                    )
-                                }
-                            }
+                        if (BuildConfig.DEBUG) {
+                            DebugSection()
                         }
                     }
                 }
@@ -142,6 +110,48 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun DebugSection() {
+        Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
+        Text("Sanitized notification metadata from external apps; no text content, " +
+            "bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), " +
+            "cleared when the app process dies.")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                captured.clear()
+                captured.addAll(DebugEventStore.snapshot())
+            }) { Text("Refresh") }
+            OutlinedButton(onClick = {
+                DebugEventStore.clear()
+                captured.clear()
+            }) { Text("Clear") }
+            OutlinedButton(onClick = {
+                val report = captured.joinToString("\n\n") { event ->
+                    DebugFormat.format(event).joinToString("\n")
+                }
+                val clipboard = getSystemService(ClipboardManager::class.java)
+                clipboard.setPrimaryClip(ClipData.newPlainText("wristrelay-debug", report))
+            }) { Text("Copy all") }
+        }
+        captured.forEach { event ->
+            val lines = DebugFormat.format(event)
+            Column(
+                modifier = Modifier.padding(start = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                lines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        softWrap = false,
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
     private fun PermissionControls(permissionRequest: androidx.activity.result.ActivityResultLauncher<String>) {
         Button(onClick = {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -149,17 +159,17 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && !postingAllowed.value) {
             Button(onClick = {
                 permissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }) { Text("Allow notification posting") }
+            }) { Text("Allow showing notifications") }
         }
     }
 
     @Composable
     private fun StatusLines() {
-        Text("Notification access: " + if (listenerAccessGranted.value) "granted" else "not granted")
-        Text("Notification posting: " + if (postingAllowed.value) "allowed" else "not allowed")
+        Text("Access to your phone notifications: " + if (listenerAccessGranted.value) "on" else "off")
+        Text("Permission to show WristRelay notifications: " + if (postingAllowed.value) "on" else "off")
         Text(
             "Relay active: " + (if (SettingsGate.relayingAllowed()) "on" else "off") +
-                " (both toggles must be on)",
+                " (both switches must be on)",
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -180,7 +190,7 @@ class MainActivity : ComponentActivity() {
                         scope.launch { store.save(updated) }
                     },
                 )
-                Text("Master relay switch")
+                Text("Relay messages to the watch")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(
@@ -191,14 +201,11 @@ class MainActivity : ComponentActivity() {
                         scope.launch { store.save(updated) }
                     },
                 )
-                Text("Relay Telegram messages")
+                Text("From Telegram")
             }
             Text(
-                "Both switches stay off by default and are saved on this device. " +
-                    "While both are on, each genuinely new Telegram message is published " +
-                    "as its own independent WristRelay notification. Telegram's " +
-                    "notifications are never touched. No message contents are stored " +
-                    "anywhere by WristRelay.",
+                "Both switches are off by default and are saved only on this device. " +
+                    "WristRelay never stores message contents anywhere.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -217,21 +224,21 @@ class MainActivity : ComponentActivity() {
                     ),
                 ),
             )
-        }) { Text("Send test relay notification") }
+        }) { Text("Send a test notification") }
     }
 
     @Composable
     private fun GarminGuide() {
-        Text("Garmin Connect app filtering", style = MaterialTheme.typography.titleMedium)
+        Text("Connect your watch", style = MaterialTheme.typography.titleMedium)
         Text(
-            "1. Keep Telegram's phone notifications as they are (delete nothing).\n" +
-                "2. In Garmin Connect, open app notification settings (menu path varies by " +
-                "Connect version).\n" +
-                "3. Disable forwarding for Telegram; enable forwarding for WristRelay.\n" +
-                "4. Send a test message on the phone without opening Telegram and check the " +
-                "watch entry.\n" +
-                "Only WristRelay should be forwarded to the watch; other apps keep their " +
-                "existing forwarding settings.",
+            "1. Leave Telegram's phone notifications as they are.\n" +
+                "2. In Garmin Connect, open the app notification settings (menu names " +
+                "vary by Connect version).\n" +
+                "3. Turn off forwarding for Telegram; turn it on for WristRelay.\n" +
+                "4. Send yourself a test message without opening Telegram and check " +
+                "your watch.\n" +
+                "Only WristRelay should reach the watch; other apps keep their " +
+                "existing settings.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

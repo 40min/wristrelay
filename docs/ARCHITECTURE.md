@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-One `app` Gradle module with Kotlin and Compose. A launcher screen provides notification permission controls, persisted relay settings (master switch + explicit Telegram switch, both off by default, task 2.3), a test-relay-notification button, the Garmin Connect app-filtering guide and a Phase 0 debug section showing sanitized notification metadata captured by the listener. The manifest registers a notification listener guarded by Android's binding permission.
+One `app` Gradle module with Kotlin and Compose. A launcher screen provides notification permission controls, persisted relay settings (master switch + explicit Telegram switch, both off by default, task 2.3), a test-relay-notification button and the Garmin Connect app-filtering guide in plain consumer language. Since task 3.5 the screen uses a light/dark color scheme drawn from the launcher-icon palette (`ui/Theme.kt`); the debug-capture panel is gated behind `BuildConfig.DEBUG` so consumer surfaces carry no debug data. The manifest registers a notification listener guarded by Android's binding permission.
 
 `RelayNotificationListener` records external posted/removed events (ignoring WristRelay itself) into a bounded in-memory store (`DebugEventStore`, max 50 entries, process-lifetime only). Each record is metadata-only: package, user, key, timing, ongoing flag and extra summaries that reduce string/char-sequence values to type and length. Message bodies, titles and sender names are never read into retained state; the store is not persisted or logged.
 

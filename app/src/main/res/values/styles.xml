@@ -2,6 +2,6 @@
     <style name="Theme.WristRelay" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:colorAccent">#246B68</item>
+        <item name="android:colorAccent">#1E7A38</item>
     </style>
 </resources>
