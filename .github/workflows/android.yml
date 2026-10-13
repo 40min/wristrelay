@@ -19,6 +19,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - run: yes | sdkmanager --licenses > /dev/null
-      - run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Accept SDK licenses and install platform
+        run: |
+          echo "${ANDROID_HOME}/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
       - run: ./gradlew assembleDebug lintDebug testDebugUnitTest detekt
