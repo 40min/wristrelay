@@ -81,6 +81,9 @@ class RelayNotificationListener : NotificationListenerService() {
         val pipeline = relayPipeline() ?: return
         if (!TelegramExtractor.matches(sbn.packageName)) return
         val snapshot = TelegramExtractor.extract(sbn) ?: emptyList()
+        // 3.2 uses the same trace to accumulate processing-time evidence
+        // from live use; the figure covers detection and publication.
+        val started = System.nanoTime()
         when (val outcome = pipeline.run(sbn.key, snapshot)) {
             is RelayResult.Unextractable ->
                 DebugRecorder.relayTrace(
@@ -91,13 +94,15 @@ class RelayNotificationListener : NotificationListenerService() {
             is RelayResult.Published ->
                 DebugRecorder.relayTrace(
                     sbn.key,
-                    "extracted=${snapshot.size} emitted=${outcome.count} published=${outcome.count}",
+                    "extracted=${snapshot.size} emitted=${outcome.count} published=${outcome.count}" +
+                        " proc=${(System.nanoTime() - started) / 1_000_000}ms",
                     TelegramExtractor.TELEGRAM_PACKAGE,
                 )
             is RelayResult.Duplicate ->
                 DebugRecorder.relayTrace(
                     sbn.key,
-                    "extracted=${snapshot.size} emitted=0",
+                    "extracted=${snapshot.size} emitted=0" +
+                        " proc=${(System.nanoTime() - started) / 1_000_000}ms",
                     TelegramExtractor.TELEGRAM_PACKAGE,
                 )
             is RelayResult.Failed ->

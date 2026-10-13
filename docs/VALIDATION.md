@@ -39,7 +39,7 @@ Owner live check: after reinstall, toggles survive a process kill and app relaun
 
 ### Task 2.2 silent channel (open device item)
 
-Phone: relay notifications are silent by design (new channel `wristrelay.relayed_messages_silent`, IMPORTANCE_LOW, no sound; the legacy loud prototype channel is untouched). Watch: whether Garmin Connect still mirrors and vibrates for notifications from the silent channel is the open item — validated via live daily use (owner decision 2026-10-13: no on-demand reproduction). If the watch stops mirroring after this change, evidence goes to VALIDATION here and the channel/importance decision is re-made with that data.
+Phone: relay notifications are silent by design (new channel `wristrelay.relayed_messages_silent`, IMPORTANCE_LOW, no sound; the legacy loud prototype channel is untouched). Watch: **owner-confirmed 2026-10-13** — the test relay notification reached the vívoactive 5 with vibration through the silent channel; mirroring with the silent channel is verified. Any later watch change is processed as a regular issue (owner decision 2026-10-13).
 
 ## Parser variant coverage (task 2.1)
 
@@ -150,6 +150,25 @@ Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format 
 Result: Pass — fix verified on device (owner re-test on build `2c20760`): a lone ONE relays again, and ONE/TWO/THREE all arrive as independent entries after the array rebuild.
 
 Go/No-Go and outstanding issues: swallow resolved. Open limitation recorded: late-arriving offline messages whose per-message timestamp is older than the watermark are treated as already-relayed and stay silent. R1–R6 evidence script pending owner.
+
+### 2026-10-13 — Task 3.1 watch presentation (partial, owner-decided scope)
+
+Date and versions: Pixel 8 + vívoactive 5 + Garmin Connect; relay build with all Epic 2 fixes installed and in daily use since 2026-10-13.
+
+Scenario and configuration: relay toggles on; silent relay channel; Telegram forwarding off / WristRelay on in Garmin Connect (owner 0.3 setup unchanged).
+
+Expected / observed:
+
+- Long messages relayed as independent entries (owner live check, 2026-10-13).
+- Phone locked: relay notifications still mirror to the watch (owner live check, 2026-10-13).
+- Silent-channel mirroring with vibration confirmed earlier the same day (see 2.2 section).
+- Notifications arrive once, and R-series evidence shows no duplicates through restart/rebind/regrant.
+
+Sanitized evidence: owner's staged replies of 2026-10-13 (Stages 2–3, S1, R1–R6); no message content.
+
+Result: Pass (owner-verified subset)
+
+Go/No-Go and outstanding issues: owner decision 2026-10-13 — the remaining watch-side cases (rapid arrivals, Bluetooth reconnect, watch privacy/activity settings, exact Garmin Connect menu path and versions) are NOT reproduced on demand; anything discovered in daily use will be processed as a regular issue. Excellent 3.3 notes: record OS/Telegram/Connect versions for release docs when convenience allows.
 
 ### 2026-10-13 — Task 2.4 owner evidence run R1–R6
 
