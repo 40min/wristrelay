@@ -36,3 +36,13 @@ Static audit recorded 2026-10-13 (commits through `1aedc60`):
 - Release signing: absent by design; debug-signed builds only. Release material is task 3.3 work and stays outside the repository.
 
 Still open for 3.2 (needs a device session, deferred to live use or a later session): measured typical/burst processing time (trace instrumentation `proc=Xms` shipped 2026-10-13 so live use accumulates the evidence), memory under normal operation, daily battery delta, idle CPU, and the 24-hour idle workload profile.
+
+## Dynamic measurements (2026-10-13, read-only adb, owner device during normal use)
+
+Measurement method: `dumpsys` reads over USB for the relay process/uid only; owner-side burst test (14 synthetic messages sent back-to-back); statistics window = the last full charge (4h 30m of heavy interactive use); battery "Optimized" (stock), no exemptions.
+
+- Processing time (typical + burst): every relay event in the burst — 14/14 relayed — shows `proc=5ms`/`proc=7ms` per event in the RELAY trace. Target <20ms met with 3× headroom. (Note: ~300ms capture delay is the system callback latency, out of scope for processing cost.)
+- CPU / idle: battery-stats record 830ms user + 1.65s kernel CPU for the whole 4.5h window (~2.5s total); instant `cpuinfo` snapshot 0.5% (one core's worth of context, mostly kernel). Event-driven by construction, zero polling.
+- Battery: UID `u0a470` estimated drain 1.80 mAh over the 4.5h-window against 4374 mAh capacity ≈ 0.04% of a charge; a uniform-24h extrapolation stays ≈0.1%/day — an order of magnitude under the <1%/day target. No self-acquired wake locks (the batterystats wake-lock rows attributed to the uid are system-side attribution such as the post-notification hold, total ~1–3s in window).
+- Network: zero — by construction (no INTERNET permission, no network deps) and empirically (the uid appears nowhere in battery-stats network accounting rows; cells list other uids).
+- Memory: measured with the launcher screen paused-but-alive: TOTAL PSS 62.9MB (incl. ~23.5MB shared system + Compose UI), private-per-App-Summary ≈ 36.2MB (Java 7.6 / Native 9.5 / Code 6.1 / Stack 0.5 / Graphics 8.1 / Private Other 4.5). The <30MB steady-state target refers to listener-only memory: **re-measure once the app screen has been closed (swiped from recents or process idle) for a few hours** — recorded as the single remaining 3.2 item; the current figure is NOT presented as achieving the target.
