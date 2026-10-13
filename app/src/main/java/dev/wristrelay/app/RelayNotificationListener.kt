@@ -69,32 +69,30 @@ class RelayNotificationListener : NotificationListenerService() {
     }
 
     private fun handleRelayCandidate(sbn: StatusBarNotification) {
+        val pipeline = relayPipeline() ?: return
         if (!TelegramExtractor.matches(sbn.packageName)) return
-        if (!PrototypeRelaySwitch.enabled) return
-        val tracker = tracker ?: return
-        val publisher = publisher ?: return
+        val snapshot = TelegramExtractor.extract(sbn) ?: emptyList()
+        when (val outcome = pipeline.run(sbn.key, snapshot)) {
+            is dev.wristrelay.app.processing.RelayResult.Unextractable ->
+                debugTrace(sbn.key, "extract=null (unsupported/missing messaging array)")
+            is dev.wristrelay.app.processing.RelayResult.Published ->
+                debugTrace(
+                    sbn.key,
+                    "extracted=${snapshot.size} emitted=${outcome.count} published=${outcome.count}",
+                )
+            is dev.wristrelay.app.processing.RelayResult.Duplicate ->
+                debugTrace(sbn.key, "extracted=${snapshot.size} emitted=0")
+            is dev.wristrelay.app.processing.RelayResult.Failed ->
+                debugTrace(sbn.key, outcome.reason)
+        }
+    }
 
-        val key = sbn.key
-        val snapshot = TelegramExtractor.extract(sbn)
-        if (snapshot == null) {
-            debugTrace(key, "extract=null (unsupported/missing messaging array)")
-            return
-        }
-        val fresh = try {
-            tracker.newMessages(key, snapshot)
-        } catch (t: Throwable) {
-            debugTrace(key, "tracker failed: ${t.javaClass.simpleName}")
-            return
-        }
-        if (fresh.isEmpty()) {
-            debugTrace(key, "extracted=${snapshot.size} emitted=0")
-            return
-        }
-        try {
-            publisher.publish(fresh)
-            debugTrace(key, "extracted=${snapshot.size} emitted=${fresh.size} published=${fresh.size}")
-        } catch (t: Throwable) {
-            debugTrace(key, "publish failed after emitting ${fresh.size}: ${t.javaClass.simpleName}")
+    /** Source gate plus readiness check; null means do not touch this event. */
+    private fun relayPipeline(): dev.wristrelay.app.processing.TelegramRelayPipeline? {
+        val ready = PrototypeRelaySwitch.enabled && tracker != null && publisher != null
+        return when {
+            ready -> dev.wristrelay.app.processing.TelegramRelayPipeline(tracker!!, publisher!!)
+            else -> null
         }
     }
 

@@ -54,7 +54,7 @@ Open the project in Android Studio, or use the Gradle wrapper with JDK 17+ and A
 
 ```sh
 ./gradlew assembleDebug
-./gradlew lintDebug testDebugUnitTest
+./gradlew lintDebug testDebugUnitTest detekt
 ```
 
 Set `ANDROID_HOME` to your SDK directory or use an untracked `local.properties`. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. No signing keys or machine-specific configuration belong in Git.

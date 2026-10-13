@@ -12,29 +12,31 @@ class DebugCaptureTest {
         DebugEventStore.clear()
     }
 
-    private fun event(
-        seq: Long = 1L,
-        action: String = "POSTED",
-        pkg: String = "org.example.app",
-        extras: List<ExtraSummary> = emptyList(),
-        postTimeMs: Long = 1_000L,
-        captureMs: Long = 1_050L,
-    ) = DebugEvent(
-        seq = seq,
-        wallClockMs = captureMs,
-        action = action,
-        packageName = pkg,
+    private data class EventSpec(
+        val seq: Long = 1L,
+        val action: String = "POSTED",
+        val pkg: String = "org.example.app",
+        val extras: List<ExtraSummary> = emptyList(),
+        val postTimeMs: Long = 1_000L,
+        val captureMs: Long = 1_050L,
+    )
+
+    private fun event(spec: EventSpec = EventSpec()) = DebugEvent(
+        seq = spec.seq,
+        wallClockMs = spec.captureMs,
+        action = spec.action,
+        packageName = spec.pkg,
         userId = 0,
-        key = "0|org.example.app|1|null|1000",
+        key = "0|${spec.pkg}|1|null|1000",
         isOngoing = false,
-        postTimeMs = postTimeMs,
-        extras = extras,
+        postTimeMs = spec.postTimeMs,
+        extras = spec.extras,
     )
 
     @Test
     fun `store is bounded and evicts oldest`() {
         for (seq in 1..(DebugEventStore.MAX_EVENTS + 5)) {
-            DebugEventStore.append(event(seq = seq.toLong()))
+            DebugEventStore.append(event(EventSpec(seq = seq.toLong())))
         }
         val snapshot = DebugEventStore.snapshot()
         assertEquals(DebugEventStore.MAX_EVENTS, snapshot.size)
@@ -69,7 +71,7 @@ class DebugCaptureTest {
             DebugFormat.summarizeExtra("android.messages", ExtraKind.PARCELABLE_ARRAY, 3),
             DebugFormat.summarizeExtra("android.showWhen", ExtraKind.BOOLEAN, null),
         )
-        val lines = DebugFormat.format(event(extras = extras))
+        val lines = DebugFormat.format(event(EventSpec(extras = extras)))
         val joined = lines.joinToString("\n")
         assertTrue(joined.contains("extra android.text: String len=42"))
         assertTrue(joined.contains("extra android.title: CharSequence len=7"))

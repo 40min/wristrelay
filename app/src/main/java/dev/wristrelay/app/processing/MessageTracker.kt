@@ -26,22 +26,24 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
      * spans more than one position (e.g. Telegram delivers several updates
      * while the listener was busy) to avoid losing arrivals.
      */
-    fun newMessages(conversationKey: String, snapshot: List<RelayMessage>): List<RelayMessage> {
-        if (snapshot.isEmpty()) {
-            // No message entries: e.g. summary-style notification. Not evidence
-            // that entries were read, so the cursor is left untouched.
-            return emptyList()
+    fun newMessages(conversationKey: String, snapshot: List<RelayMessage>): List<RelayMessage> = when {
+        // No message entries: e.g. summary-style notification. Not evidence
+        // that entries were read, so the cursor is left untouched.
+        snapshot.isEmpty() -> emptyList()
+        snapshot.size <= lastRelayedCount(conversationKey) ->
+            shrinkOrRepeat(conversationKey, snapshot.size)
+        else -> {
+            val fresh = snapshot.subList(lastRelayedCount(conversationKey), snapshot.size)
+            remember(conversationKey, snapshot.size)
+            fresh.toList()
         }
-        val seen = lastRelayedCount[conversationKey] ?: 0
-        if (snapshot.size <= seen) {
-            // Sources may shrink on dismissal or read. Treat as a read: reset
-            // the cursor to the current size; nothing older is re-emitted.
-            if (snapshot.size < seen) remember(conversationKey, snapshot.size)
-            return emptyList()
-        }
-        val fresh = snapshot.subList(seen, snapshot.size)
-        remember(conversationKey, snapshot.size)
-        return fresh.toList()
+    }
+
+    private fun lastRelayedCount(conversationKey: String): Int = lastRelayedCount[conversationKey] ?: 0
+
+    private fun shrinkOrRepeat(conversationKey: String, current: Int): List<RelayMessage> {
+        if (current < lastRelayedCount(conversationKey)) remember(conversationKey, current)
+        return emptyList()
     }
 
     /**

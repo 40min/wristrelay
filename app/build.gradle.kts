@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 android {
@@ -32,4 +33,18 @@ dependencies {
     implementation("androidx.compose.foundation:foundation:1.9.0")
     implementation("androidx.compose.material3:material3:1.3.2")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.test:core:1.7.0")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    source.setFrom("src/main/java", "src/test/java")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    // The Gradle daemon may run on a newer JDK than detekt's Kotlin analyzer
+    // supports; pin analysis to the compile target instead.
+    jvmTarget = "17"
 }

@@ -29,7 +29,15 @@ object TelegramExtractor {
      * unsupported (no messaging array, unexpected element type).
      */
     fun extract(sbn: StatusBarNotification): List<RelayMessage>? {
-        val chat = sbn.notification?.extras ?: return null
+        val extras: Bundle = sbn.notification?.extras ?: return null
+        return extractBundle(extras)
+    }
+
+    /**
+     * Bundle-level extraction entry point; identical shapes arrive both from
+     * the listener and from synthetic fixtures.
+     */
+    fun extractBundle(chat: Bundle): List<RelayMessage>? {
         val conversationTitle = chat.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val messages = chat.getParcelableArray(Notification.EXTRA_MESSAGES) ?: return null
 

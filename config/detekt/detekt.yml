@@ -1,0 +1,21 @@
+# Detekt runs on top of the default rule set (buildUponDefaultConfig).
+# Only deviations from defaults are recorded here; keep suppressions out —
+# fix code instead. Formatting rules (detekt-formatting) are not enabled.
+config:
+  warningsAsErrors: false
+
+complexity:
+  LongMethod:
+    active: false
+
+style:
+  MaxLineLength:
+    maxLineLength: 140
+  MagicNumber:
+    active: false
+  WildcardImport:
+    active: false
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']

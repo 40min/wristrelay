@@ -62,7 +62,8 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text("WristRelay", style = MaterialTheme.typography.headlineLarge)
                         Text("Project skeleton. Telegram notification relay is not yet implemented.")
-                        Text("Notification access allows Android to connect the listener. This skeleton does not read or relay notifications.")
+                        Text("Notification access allows Android to connect the listener. " +
+                            "This skeleton does not read or relay notifications.")
                         Button(onClick = {
                             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         }) { Text("Open notification access settings") }
@@ -76,7 +77,9 @@ class MainActivity : ComponentActivity() {
                         RelayToggle()
 
                         Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
-                        Text("Sanitized notification metadata from external apps; no text content, bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), cleared when the app process dies.")
+                        Text("Sanitized notification metadata from external apps; no text content, " +
+                            "bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), " +
+                            "cleared when the app process dies.")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = {
                                 captured.clear()
@@ -145,7 +148,9 @@ private fun RelayToggle() {
             Text("Prototype relay (task 0.2)")
         }
         Text(
-            "Off by default. While on, each genuinely new Telegram message is published as its own independent WristRelay notification. Telegram's notifications are never touched.",
+            "Off by default. While on, each genuinely new Telegram message is published " +
+                "as its own independent WristRelay notification. Telegram's notifications " +
+                "are never touched.",
             style = MaterialTheme.typography.bodySmall,
         )
     }
