@@ -1,6 +1,8 @@
 package dev.wristrelay.app
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -80,6 +82,13 @@ class MainActivity : ComponentActivity() {
                                 DebugEventStore.clear()
                                 captured.clear()
                             }) { Text("Clear") }
+                            OutlinedButton(onClick = {
+                                val report = captured.joinToString("\n\n") { event ->
+                                    DebugFormat.format(event).joinToString("\n")
+                                }
+                                val clipboard = getSystemService(ClipboardManager::class.java)
+                                clipboard.setPrimaryClip(ClipData.newPlainText("wristrelay-debug", report))
+                            }) { Text("Copy all") }
                         }
                         captured.forEach { event ->
                             val lines = DebugFormat.format(event)
