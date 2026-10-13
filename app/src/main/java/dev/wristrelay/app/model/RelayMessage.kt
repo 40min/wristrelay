@@ -9,4 +9,5 @@ data class RelayMessage(
     val isGroup: Boolean,
     val sender: String?,
     val text: String?,
+    val timestampMs: Long? = null,
 )

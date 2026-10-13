@@ -15,8 +15,19 @@ import dev.wristrelay.app.model.RelayMessage
  * cumulative `EXTRA_MESSAGES` array. Message entries carry no stable message
  * identity key, so messages are identified positionally by the detector.
  *
- * Unknown/unsupported snapshot shapes yield null and are skipped rather than
- * guessed at.
+ * Variant handling (fixture-tested; limitations in VALIDATION/ARCHITECTURE):
+ * - Group conversations carry EXTRA_IS_GROUP_CONVERSATION and per-message
+ *   sender persons; private chats may omit senders (null is tolerated).
+ * - Message entries with blank/no text (media-only, redacted or stripped
+ *   payloads) are skipped rather than relayed as empty notifications.
+ * - Per-message timestamps are taken as delivered; the array order is
+ *   authoritative and timestamps never re-sort messages, so out-of-order
+ *   clock values cannot change positional identity.
+ * - Whole-conversation summary notifications carry no EXTRA_MESSAGES array;
+ *   they describe chat state, not a message, and remain unsupported here —
+ *   the caller decides how to treat the null (no emit).
+ * - Unrecognized snapshot shapes yield null and are skipped rather than
+ *   guessed at.
  */
 object TelegramExtractor {
 
@@ -42,10 +53,11 @@ object TelegramExtractor {
         val messages = chat.getParcelableArray(Notification.EXTRA_MESSAGES) ?: return null
 
         val isGroup = chat.getBoolean(EXTRA_IS_GROUP_CONVERSATION)
-        return messages.mapNotNull { entry ->
+        val extracted = messages.mapNotNull { entry ->
             if (entry !is Bundle) return@mapNotNull null
             toRelayMessage(entry, conversationTitle, isGroup)
-        }.takeIf { it.isNotEmpty() }
+        }
+        return extracted.takeIf { it.isNotEmpty() }
     }
 
     private fun toRelayMessage(
@@ -55,19 +67,30 @@ object TelegramExtractor {
     ): RelayMessage? {
         val text = messageBundle.getCharSequence(KEY_MESSAGE_TEXT)?.toString()
         if (text.isNullOrBlank()) return null
-        val sender = messageBundle.getParcelable<Person>(KEY_MESSAGE_SENDER_PERSON)
-            ?.name?.toString()
+        val sender = messageBundle.getParcelable<Person>(KEY_MESSAGE_SENDER_PERSON)?.name?.toString()
+            ?: messageBundle.getString(KEY_MESSAGE_SENDER_NAME)
+        val timestamp = when (val delivered = messageBundle.get(KEY_MESSAGE_TIME)) {
+            is Long -> delivered
+            is Int -> delivered.toLong()
+            else -> null
+        }
         return RelayMessage(
             conversationTitle = conversationTitle,
             isGroup = isGroup,
             sender = sender,
             text = text,
+            timestampMs = timestamp,
         )
     }
 
     // Bundle keys mirror the framework MessagingStyle.Message keys (constants
     // are not public API); verified against real Telegram snapshots in 0.1.
+    // sender_person is the modern per-message sender; "sender" is the legacy
+    // plain-string key written by older MessagingStyle.Message payloads and
+    // is accepted as a fallback so historic sender shapes do not vanish.
     private const val KEY_MESSAGE_TEXT = "text"
     private const val KEY_MESSAGE_SENDER_PERSON = "sender_person"
+    private const val KEY_MESSAGE_SENDER_NAME = "sender"
+    private const val KEY_MESSAGE_TIME = "time"
     private const val EXTRA_IS_GROUP_CONVERSATION = "android.isGroupConversation"
 }
