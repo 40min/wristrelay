@@ -20,26 +20,7 @@ Pass only if all three remain independently accessible. If Connect or the watch 
 3. Owner opens WristRelay's debug screen, taps Refresh and records the sanitized lines shown (they contain package/user/key/timing/extra-shape only — safe to share).
 4. Repeat for: first message in a chat, second message in the same chat (update), third message, and after clearing the chat. Note POSTED vs REMOVED lines.
 
-### 2026-10-13 — Task 2.4 finding: first-of-series message swallowed (diagnosis + fix)
-
-Date and versions: Pixel 8, `org.telegram.messenger`, WristRelay build with tasks 2.1–2.3 (`4345edb`).
-
-Scenario: live sanity check (one/two/three sent into one chat; relay toggles on) plus controlled repro with the new debug traces (`d1e024d`): ONE alone — nothing relayed; series — first message missing, remainder relayed; repeated 3×, also with 4 messages.
-
-Expected / observed:
-
-- Telegram phone-side showed all entries cumulatively (`android.messages` len 1→2→3); WristRelay relayed only the 2nd+ messages. Trace pattern with zero `CONNECT`/`BASELINE` lines: `RELAY extracted=1 emitted=0` for the first, then emitted=1 — so no listener rebind; the tracker's positional cursor treated Telegram's rebuilt fresh array (smaller than the previous series) as "shrink = read", swallowing the genuinely new message inside it.
-- Root cause: Telegram rebuilds the cumulative array from scratch at times (device-verified behavior); positional-only detection cannot distinguish rebuilt-new-content from unread-old-leftovers.
-
-Fix (commit after `d1e024d`): `MessageTracker` cursors now also carry the newest relayed message timestamp. Shrink snapshots classify entries by per-message timestamp: strictly newer than the relaid watermark → emitted (rebuilt fresh arrays relay their content); older-or-equal → already-relayed leftovers, silent. Entries without timestamps keep conservative behavior. Battery for WristRelay: "Optimized" (stock).
-
-Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format only: POSTED len/counts, RELAY emitted counts, key `0|org.telegram.messenger|386558704|null|10278`); no message content.
-
-Result: Pass — fix verified on device (owner re-test on build `2c20760`): a lone ONE relays again, and ONE/TWO/THREE all arrive as independent entries after the array rebuild.
-
-Go/No-Go and outstanding issues: swallow resolved. Open limitation recorded: late-arriving offline messages whose per-message timestamp is older than the watermark are treated as already-relayed and stay silent. R1–R6 evidence script pending owner.
-
-### Task 2.4 owner run script (pending — feeds ADR-008 cleanup decision)
+### Task 2.4 owner run script (feeds ADR-008 decision — completed 2026-10-13)
 
 Run once during live daily use, relay toggles on, tokens ONE/TWO/THREE/OK only. Each answer is two facts: what survived, and yes/no REMOVED line in the debug screen. No message content.
 
@@ -50,7 +31,7 @@ Run once during live daily use, relay toggles on, tokens ONE/TWO/THREE/OK only. 
 - R5 — Access revoke/regrant: revoke Notification Access, record the status line and that nothing crashes; re-grant, send OK, expect exactly one relay entry and no replay.
 - R6 — Posting revoke/regrant: revoke POST_NOTIFICATIONS (Android 13+), send OK (needs the synthetic-message helper from step 0.x), record that Telegram works but no relay entry appears and the app does not crash; re-grant, send OK again, relay resumes exactly once.
 
-Results decide the automatic cleanup policy (never cancel Telegram; the policy must protect unread watch entries — ADR-008).
+Results recorded in the Run log below; the outcome became ADR-012 (no automatic cleanup).
 
 ### Task 2.3 persistent settings (open device item)
 
@@ -150,6 +131,46 @@ Sanitized evidence: owner's report of 2026-10-13 (quoted above, verified in sess
 Result: Pass
 
 Go/No-Go and outstanding issues: **Go** — owner declared Phase 0 success: correct text, vibration, all three entries independently browsable. Production relay work (Epic 2, blocked via task 2.1) may start. Open items: record the exact Connect settings menu path and Connect version; explicit confirmation that Telegram itself produced no watch entries; suitable silence later against watch forwarding is a 2.2/3.1 concern.
+
+### 2026-10-13 — Task 2.4 finding: first-of-series message swallowed (diagnosis + fix)
+
+Date and versions: Pixel 8, `org.telegram.messenger`, WristRelay build with tasks 2.1–2.3 (`4345edb`).
+
+Scenario: live sanity check (one/two/three sent into one chat; relay toggles on) plus controlled repro with the new debug traces (`d1e024d`): ONE alone — nothing relayed; series — first message missing, remainder relayed; repeated 3×, also with 4 messages.
+
+Expected / observed:
+
+- Telegram phone-side showed all entries cumulatively (`android.messages` len 1→2→3); WristRelay relayed only the 2nd+ messages. Trace pattern with zero `CONNECT`/`BASELINE` lines: `RELAY extracted=1 emitted=0` for the first, then emitted=1 — so no listener rebind; the tracker's positional cursor treated Telegram's rebuilt fresh array (smaller than the previous series) as "shrink = read", swallowing the genuinely new message inside it.
+- Root cause: Telegram rebuilds the cumulative array from scratch at times (device-verified behavior); positional-only detection cannot distinguish rebuilt-new-content from unread-old-leftovers.
+
+Fix (commit after `d1e024d`): `MessageTracker` cursors now also carry the newest relayed message timestamp. Shrink snapshots classify entries by per-message timestamp: strictly newer than the relaid watermark → emitted (rebuilt fresh arrays relay their content); older-or-equal → already-relayed leftovers, silent. Entries without timestamps keep conservative behavior. Battery for WristRelay: "Optimized" (stock).
+
+Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format only: POSTED len/counts, RELAY emitted counts, key `0|org.telegram.messenger|386558704|null|10278`); no message content.
+
+Result: Pass — fix verified on device (owner re-test on build `2c20760`): a lone ONE relays again, and ONE/TWO/THREE all arrive as independent entries after the array rebuild.
+
+Go/No-Go and outstanding issues: swallow resolved. Open limitation recorded: late-arriving offline messages whose per-message timestamp is older than the watermark are treated as already-relayed and stay silent. R1–R6 evidence script pending owner.
+
+### 2026-10-13 — Task 2.4 owner evidence run R1–R6
+
+Date and versions: Pixel 8 + vívoactive 5 + Garmin Connect; WristRelay with the timestamp-classification fix (`2c20760`+); battery stock "Optimized".
+
+Scenario and configuration: relay toggles on; R1–R6 per the script above; synthetic vocabulary only.
+
+Expected / observed:
+
+- R1: owner removed only Telegram's phone notification → the relay entry survived on the phone and the watch. Telegram removal is therefore **not** read evidence and must never trigger cleanup.
+- R2: system clear-all removed Telegram and relay entries on the phone; watch copies disappeared as well (mirroring follows user-initiated phone cancellations).
+- R3: dismissing WristRelay's relay entry on the phone removed the watch copy (explicit user cleanup; expected mirror behavior).
+- R4: force-stop then OK → relayed exactly once, no stale replay (the reconnect baseline behaved as designed).
+- R5: Notification Access revoke showed the status line without crashing; re-grant → OK relayed once, no duplicates.
+- R6: posting revocation was exercised by the owner previously (graceful suppression, no crash) and is unit-covered by the posting-disabled publisher test.
+
+Sanitized evidence: owner's one-line answers per the script (single facts, no message content), 2026-10-13.
+
+Result: Pass
+
+Go/No-Go and outstanding issues: ADR-012 recorded (no automatic cleanup — see DECISIONS.md). Phone-side daily-use behaviors are validated; the remaining reliability-matrix rows are watch-side and belong to task 3.1 (locked phone, Bluetooth reconnect, watch privacy settings, long/silent mirroring).
 
 ### Template for future runs
 

@@ -17,7 +17,7 @@ Task 2.1 parser variant handling (fixture-covered; see VALIDATION.md for what is
 3. Telegram adapter extracts normalized messages and relevant snapshot metadata, ignoring inappropriate summaries.
 4. Detector compares successive source states and identifies genuinely new messages.
 5. Relay allocates unique active notification identities and publishes an independent entry per message.
-6. Cleanup applies a policy validated against real removal/replacement behavior.
+6. Cleanup applies a policy validated against real removal/replacement behavior: there is no automatic cleanup (ADR-012, owner evidence R1–R3, 2026-10-13). Telegram notification removal is not read evidence and never triggers anything; relay entries persist until the user dismisses them or the system removes them, and those explicit user actions propagate to watch copies via mirroring.
 
 Responsibilities can live in `listener`, `source/telegram`, `model`, `processing`, `relay`, `settings` and `ui` packages. Create implementations when needed rather than empty placeholder classes. No `NotificationSource` abstraction exists while only one source is verified; a shared interface will be extracted if and when a second verified source arrives. Detector APIs remain provisional until Phase 0 provides actual metadata.
 

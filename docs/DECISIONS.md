@@ -15,6 +15,7 @@ Recorded 2026-10-10 from the agreed planning discussion. These decisions describ
 | ADR-009 | Garmin Connect mirrors Android notifications | No direct Bluetooth or Garmin API integration is needed for the initial approach. |
 | ADR-010 | Apache-2.0 license | Use the license proposed in the agreed open-source plan. |
 | ADR-011 | Minimum API 29 remains provisional | Start at Android 10 and revisit only with compatibility evidence. |
+| ADR-012 | No automatic cleanup: relay entries live until the user or the system removes them | Owner evidence R1–R3 (2026-10-13, VALIDATION.md): removing Telegram's phone notification did not remove relay entries (phone or watch), so Telegram removal is not read evidence and must not trigger cleanup (ADR-008 upheld). User-initiated dismissal and system clear-all remove relay entries and propagate to the watch via mirroring, which is the intended explicit-cleanup path. Implementing no automatic policy removes the last risk of deleting unread watch entries and adds no code. Only Telegram (ADR-003) unverified-invariants note: if a future device check shows Telegram removal masking unread messages, the evidence policy is revisited. |
 
 ## Superseded proposals
 
