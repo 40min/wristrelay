@@ -76,6 +76,19 @@ object DebugFormat {
     fun summarizeExtra(key: String, kind: ExtraKind, length: Int?): ExtraSummary =
         ExtraSummary(key = key, kind = kind.label, length = length)
 
+    /** Returns (key, kind, length) or null when the value cannot be described. */
+    fun summarize(key: String, value: Any?): Triple<String, ExtraKind, Int?>? {
+        if (value == null) return null
+        return when (value) {
+            is String -> Triple(key, ExtraKind.STRING, value.length)
+            is CharSequence -> Triple(key, ExtraKind.CHARSEQ, value.length)
+            is Array<*> -> Triple(key, ExtraKind.PARCELABLE_ARRAY, value.size)
+            is Long, is Int -> Triple(key, ExtraKind.LONG, value.toString().length)
+            is Boolean -> Triple(key, ExtraKind.BOOLEAN, null)
+            else -> Triple(key, ExtraKind.OTHER, null)
+        }
+    }
+
     fun describeTimestamps(posted: Long, captureMs: Long): String {
         val delay = captureMs - posted
         val postUtc = java.time.Instant.ofEpochMilli(posted)

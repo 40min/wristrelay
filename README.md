@@ -35,7 +35,7 @@ Telegram keeps its normal phone notifications. In Garmin Connect, users disable 
 
 ## Current status
 
-**Feasibility prototype build is ready — watch acceptance is pending.** The app has a Compose screen with permission controls, an off-by-default task 0.2 prototype relay toggle and a notification-listener service that (a) records metadata-only debug captures (no text content, bounded in-memory) and (b) relays genuinely new Telegram messages as independent notifications from a Telegram-captured, positionally diffed snapshot. Everything phone-side works; whether the watch shows ONE, TWO, THREE as three independently browsable entries is the pending physical gate.
+**Phone-side relay is implemented and hardening (Epic 2); watch acceptance proved in Phase 0.** On Pixel 8 + vívoactive 5 the owner verified ONE, TWO, THREE arriving as three independently vibrated, browsable watch entries with Telegram phone notifications untouched (Phase 0 Go, 2026-10-13). The app has a Compose screen with permission controls, persisted relay settings (master + Telegram toggles, off by default), a test-notification button, the Garmin Connect filtering guide and a metadata-only debug capture. Relay side: silent Android channel, unique-per-message notification ids, one-entry-per-new-message with no overwrite of earlier entries and baseline handling for restarts/reconnections.
 
 The first milestone is a feasibility APK tested on Pixel 8 and vívoactive 5: the watch must show **ONE, TWO, THREE**, and all three must remain independently browsable. Production relay development depends on that result. Watch compatibility and battery targets are not yet verified.
 

@@ -20,6 +20,10 @@ Pass only if all three remain independently accessible. If Connect or the watch 
 3. Owner opens WristRelay's debug screen, taps Refresh and records the sanitized lines shown (they contain package/user/key/timing/extra-shape only — safe to share).
 4. Repeat for: first message in a chat, second message in the same chat (update), third message, and after clearing the chat. Note POSTED vs REMOVED lines.
 
+### Task 2.3 persistent settings (open device item)
+
+Owner live check: after reinstall, toggles survive a process kill and app relaunch; the "Send test relay notification" button posts one silent-channel entry (watch mirrors it); the guide maps to what the owner's Connect version actually shows (record exact menu path per the 0.3 follow-up).
+
 ### Task 2.2 silent channel (open device item)
 
 Phone: relay notifications are silent by design (new channel `wristrelay.relayed_messages_silent`, IMPORTANCE_LOW, no sound; the legacy loud prototype channel is untouched). Watch: whether Garmin Connect still mirrors and vibrates for notifications from the silent channel is the open item — validated via live daily use (owner decision 2026-10-13: no on-demand reproduction). If the watch stops mirroring after this change, evidence goes to VALIDATION here and the channel/importance decision is re-made with that data.
