@@ -2,7 +2,7 @@
 
 **Every message deserves its own place on your wrist.**
 
-WristRelay is an offline Android notification bridge, initially designed for **Telegram → Garmin Connect → Garmin vívoactive 5**.
+WristRelay is an offline Android notification bridge, initially designed for **Telegram → Garmin Connect → Garmin watch**.
 
 ## Why build this?
 
@@ -35,9 +35,9 @@ Telegram keeps its normal phone notifications. In Garmin Connect, users disable 
 
 ## Current status
 
-**Phone-side relay is implemented and hardening (Epic 2); watch acceptance proved in Phase 0.** On Pixel 8 + vívoactive 5 the owner verified ONE, TWO, THREE arriving as three independently vibrated, browsable watch entries with Telegram phone notifications untouched (Phase 0 Go, 2026-10-13). The app has a Compose screen with permission controls, persisted relay settings (master + Telegram toggles, off by default), a test-notification button, the Garmin Connect filtering guide and a metadata-only debug capture. Relay side: silent Android channel, unique-per-message notification ids, one-entry-per-new-message with no overwrite of earlier entries and baseline handling for restarts/reconnections.
+**Phone-side relay is implemented and hardening (Epic 2); watch acceptance proved in Phase 0.** On an Android phone + Garmin watch, verification confirmed ONE, TWO, THREE arriving as three independently vibrated, browsable watch entries with Telegram phone notifications untouched (Phase 0 Go, 2026-10-13). The app has a Compose screen with permission controls, persisted relay settings (master + Telegram toggles, off by default), a test-notification button, the Garmin Connect filtering guide and a metadata-only debug capture. Relay side: silent Android channel, unique-per-message notification ids, one-entry-per-new-message with no overwrite of earlier entries and baseline handling for restarts/reconnections.
 
-The first milestone is a feasibility APK tested on Pixel 8 and vívoactive 5: the watch must show **ONE, TWO, THREE**, and all three must remain independently browsable. Production relay development depends on that result. Watch compatibility and battery targets are not yet verified.
+The first milestone was a feasibility APK tested on an Android phone and a Garmin watch: the watch must show **ONE, TWO, THREE**, and all three must remain independently browsable. Production relay development depends on that result. Watch compatibility and battery targets are not yet verified.
 
 ## Privacy by design
 
@@ -70,7 +70,7 @@ The project uses Kotlin, Jetpack Compose, Gradle Kotlin DSL and one Android appl
 | [Architecture](docs/ARCHITECTURE.md) | Intended pipeline and current skeleton boundaries |
 | [Decision history](docs/DECISIONS.md) | Why the agreed choices were made |
 | [Privacy and security](docs/PRIVACY.md) | Permissions, retention and release audit |
-| [Device validation](docs/VALIDATION.md) | Pixel/Garmin acceptance and evidence checklist |
+| [Device validation](docs/VALIDATION.md) | Android/Garmin acceptance and evidence checklist |
 | [Development](docs/DEVELOPMENT.md) | Build, checks and contribution rules |
 | [Task index](docs/TASKS.md) | Dart epics and implementation tasks |
 

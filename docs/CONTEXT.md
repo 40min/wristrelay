@@ -2,7 +2,7 @@
 
 WristRelay exists because updating a grouped Telegram notification may alert a Garmin watch while repeatedly presenting the first unread message. This is the reported motivating behavior, not a verified finding across all Telegram or Garmin versions.
 
-The initial environment is Pixel 8, Telegram, Garmin Connect and Garmin vívoactive 5. Android NotificationListenerService exposes notification snapshots; WristRelay will interpret newly arriving messages and publish independent notifications for Connect to mirror. There is no direct Bluetooth or Garmin SDK integration.
+The initial environment is an Android phone, Telegram, Garmin Connect and a Garmin watch. Android NotificationListenerService exposes notification snapshots; WristRelay will interpret newly arriving messages and publish independent notifications for Connect to mirror. There is no direct Bluetooth or Garmin SDK integration.
 
 ## Product contract
 

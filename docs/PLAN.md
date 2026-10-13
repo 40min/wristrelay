@@ -4,7 +4,7 @@ Status: planning; Android skeleton only. Production Telegram relay remains unimp
 
 ## Acceptance gates
 
-- **v0.1 — Proof of concept:** Pixel 8 + Garmin vívoactive 5 display ONE, TWO, THREE as three independently browsable notifications.
+- **v0.1 — Proof of concept:** an Android phone + Garmin watch display ONE, TWO, THREE as three independently browsable notifications.
 - **v0.2 — Private beta:** daily-use reliability, settings and security hardening accepted.
 - **v1.0 — Public release:** audits, profiling, release process and documentation complete.
 
@@ -12,7 +12,7 @@ Phase 0 (Epic 0) is the critical gate. Foundation can proceed alongside it; prod
 
 ## Epic 0 — Feasibility prototype
 
-Prove on Pixel 8 and Garmin vívoactive 5 that ONE, TWO, THREE produce three correct, independently browsable watch notifications.
+Prove on an Android phone and a Garmin watch that ONE, TWO, THREE produce three correct, independently browsable watch notifications.
 
 - **0.1 — Permission and debug screen, Telegram metadata inspection.** Privacy-safe, metadata-only debug facilities and notification access/posting controls; build an installable prototype. On device, inspect Telegram MessagingStyle, extras types, conversation identifiers, timestamps, notification keys and update/removal behavior for ONE/TWO/THREE. Record sanitized structures without real message contents; verify supported package variants.
 - **0.2 — Prove extraction and publish three independent notifications.** Extract ONE, TWO, THREE from successive snapshots using synthetic fixtures; preserve two legitimate identical-text messages and document missing identity metadata. Generate unique IDs/tags and readable ungrouped notifications; never overwrite earlier entries or touch source Telegram notifications.

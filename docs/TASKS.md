@@ -1,6 +1,6 @@
 # Dart task index
 
-Board: **General/WristRelay**. Simplified 2026-10-12 to 4 epics and 12 tasks (formerly 7 epics and 25 subtasks; the originals were merged, with all acceptance criteria preserved in task descriptions, and moved to Dart trash). Dart uses `Project` + `epic` tag for phase parents and `Subtask` for children. Workspace default assignee is Andrei Sorokin.
+Board: **General/WristRelay**. Simplified 2026-10-12 to 4 epics and 12 tasks (formerly 7 epics and 25 subtasks; the originals were merged, with all acceptance criteria preserved in task descriptions, and moved to Dart trash). Dart uses `Project` + `epic` tag for phase parents and `Subtask` for children. Workspace default assignee is the owner.
 
 Epic 0 is the critical gate and blocks production relay work (encoded as a Dart blocker on task 2.1). Epic 1 foundation can run alongside it. Order: 0 → 1 → 2 → 3.
 
@@ -38,4 +38,4 @@ Epic 0 is the critical gate and blocks production relay work (encoded as a Dart 
 | htkZ8SyW954a | [3.4 — Sanitize repository docs of personal/identifying data before public release](https://app.dartai.com/t/htkZ8SyW954a-3-4-Sanitize-repository-docs) |
 | gTVd1XgrDfEn | [3.5 — Consumer-friendly UI: minimal controls, icon-theme colors, debug capture out of the consumer surface](https://app.dartai.com/t/gTVd1XgrDfEn-3-5-Consumer-friendly-UI-minim) |
 
-Board closure state (2026-10-13): Epics 0–2 done; Epic 3 subtasks 3.1/3.2 done with evidence comments; 3.3 deferred to a new session pending owner decisions (release signing location; device version numbers for release docs); 3.4 and 3.5 are new pre-release hygiene/design tasks — 3.4 must complete before any public release.
+Board closure state (2026-10-13): Epics 0–2 done; Epic 3 subtasks 3.1/3.2 done with evidence comments; 3.3 deferred pending owner decisions (release signing location; device version numbers for release docs); 3.4 done 2026-10-13 — repo docs grep-audited clean of device models, owner names and telemetry-derived ids (current state only, no history rewrite); 3.5 is the remaining pre-release hygiene/design task. 3.4 must stay clean for all future doc updates before any public release.

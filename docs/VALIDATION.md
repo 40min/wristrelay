@@ -1,6 +1,6 @@
 # Device validation
 
-Status: not performed. Record device OS, Telegram package/version, Garmin Connect version, watch firmware, channel configuration and date for each run. Use synthetic messages; avoid private content in screenshots/logs.
+Status: active device validation (run log below). Record device OS, Telegram package/version, Garmin Connect version, watch firmware, channel configuration and date for each run. Use synthetic messages; avoid private content in screenshots/logs; withhold device/uid-identifying numbers (model names, serials, notification-key id/uid fragments, battery capacity).
 
 ## Phase 0 Go/No-Go
 
@@ -9,7 +9,7 @@ Status: not performed. Record device OS, Telegram package/version, Garmin Connec
 3. Send ONE, TWO, THREE to one conversation without opening Telegram.
 4. Confirm extraction of all three from source snapshots.
 5. Publish three independent WristRelay entries.
-6. Confirm correct text and intended alerts, then browse all three on vívoactive 5.
+6. Confirm correct text and intended alerts, then browse all three on the Garmin watch.
 
 Pass only if all three remain independently accessible. If Connect or the watch groups/suppresses entries, investigate notification IDs/tags/channels/grouping before declaring Go. The skeleton implements metadata-only debug capture (step 3–5 behavior is not implemented yet); its debug screen is the evidence source for step 4.
 
@@ -39,7 +39,7 @@ Owner live check: after reinstall, toggles survive a process kill and app relaun
 
 ### Task 2.2 silent channel (open device item)
 
-Phone: relay notifications are silent by design (new channel `wristrelay.relayed_messages_silent`, IMPORTANCE_LOW, no sound; the legacy loud prototype channel is untouched). Watch: **owner-confirmed 2026-10-13** — the test relay notification reached the vívoactive 5 with vibration through the silent channel; mirroring with the silent channel is verified. Any later watch change is processed as a regular issue (owner decision 2026-10-13).
+Phone: relay notifications are silent by design (new channel `wristrelay.relayed_messages_silent`, IMPORTANCE_LOW, no sound; the legacy loud prototype channel is untouched). Watch: **owner-confirmed 2026-10-13** — the test relay notification reached the Garmin watch with vibration through the silent channel; mirroring with the silent channel is verified. Any later watch change is processed as a regular issue (owner decision 2026-10-13).
 
 ## Parser variant coverage (task 2.1)
 
@@ -75,13 +75,13 @@ Measure typical/burst processing and 24-hour idle/daily workload under stock bat
 
 ### 2026-10-13 — Task 0.1 Telegram metadata inspection
 
-Date and versions: Pixel 8, Telegram `org.telegram.messenger` (exact OS/Telegram/Connect versions not yet recorded — see outstanding items).
+Date and versions: Android phone, Telegram `org.telegram.messenger` (exact OS/Telegram/Connect versions not yet recorded — see outstanding items).
 
 Scenario and configuration: WristRelay debug capture installed, Notification Access granted; synthetic messages sent into one Telegram chat without opening Telegram; debug screen refreshed between sends.
 
 Expected / observed:
 
-- One phone notification per chat expected; three POSTED events captured for ONE/TWO/THREE, all with the identical key `0|org.telegram.messenger|386558704|null|10278` and no intervening REMOVED — Telegram updates one notification in place and reuses the id.
+- One phone notification per chat expected; three POSTED events captured for ONE/TWO/THREE, all with the identical key `0|org.telegram.messenger|<notification-id>|null|<uid>` (exact numeric id/uid withheld as identifying) and no intervening REMOVED — Telegram updates one notification in place and reuses the id.
 - `android.messages: Parcelable[]` grows 1→2→3 (cumulative MessagingStyle); `android.text` len 3/3/5; `conversationUnreadMessageCount` len=1 while its value changes (1→2→3).
 - Conversation metadata present and constant: `android.title` (len 12), `android.isGroupConversation`, `android.people.list`, `android.selfDisplayName`.
 - REMOVED event for the same key carries a stripped extras bundle (conversationUnreadMessageCount/isGroupConversation/progress only) — removal metadata is not a reduced copy of the content.
@@ -96,7 +96,7 @@ Go/No-Go and outstanding issues: not yet a Go/No-Go (that is task 0.3). Outstand
 
 ### 2026-10-13 — Task 0.2 relay prototype (phone-side)
 
-Date and versions: Pixel 8, Telegram `org.telegram.messenger`, WristRelay task 0.2 prototype build (commits `407b88b`…`8847a06`); exact app versions not yet recorded.
+Date and versions: Android phone, Telegram `org.telegram.messenger`, WristRelay task 0.2 prototype build (commits `407b88b`…`8847a06`); exact app versions not yet recorded.
 
 Scenario and configuration: relay toggle on, notification access granted, synthetic ONE/TWO/THREE/OK messages into one Telegram chat without opening Telegram; metadata-only relay trace enabled.
 
@@ -116,13 +116,13 @@ Go/No-Go and outstanding issues: phone-side acceptance met (proves extraction + 
 
 ### 2026-10-13 — Task 0.3 Garmin Connect filtering and Phase 0 Go/No-Go
 
-Date and versions: Pixel 8 + Garmin vívoactive 5 + Garmin Connect; exact OS/Connect/firmware versions not yet recorded (open follow-up).
+Date and versions: Android phone + Garmin watch + Garmin Connect; exact OS/Connect/firmware versions not yet recorded (open follow-up).
 
 Scenario and configuration: task 0.3 owner setup — in Garmin Connect the owner disabled Telegram app forwarding, enabled WristRelay, left other apps unchanged; Telegram phone notification settings untouched.
 
 Expected / observed:
 
-- Owner test: ONE, TWO, THREE each arrived on the vívoactive 5 as a separate, independent entry, each with vibration, correct synthetic text.
+- Owner test: ONE, TWO, THREE each arrived on the Garmin watch as a separate, independent entry, each with vibration, correct synthetic text.
 - After the six phone-side entries (Telegram's own + WristRelay's), the watch received exactly the WristRelay entries — no Telegram duplicates on the watch, consistent with the intended app-filtering split (owner: "doubled delivery on mobile from Telegram and WristRelay, as expected"; watch confirmation of no Telegram entries pending owner's explicit recheck).
 - Telegram phone notifications preserved.
 
@@ -134,7 +134,7 @@ Go/No-Go and outstanding issues: **Go** — owner declared Phase 0 success: corr
 
 ### 2026-10-13 — Task 2.4 finding: first-of-series message swallowed (diagnosis + fix)
 
-Date and versions: Pixel 8, `org.telegram.messenger`, WristRelay build with tasks 2.1–2.3 (`4345edb`).
+Date and versions: Android phone, `org.telegram.messenger`, WristRelay build with tasks 2.1–2.3 (`4345edb`).
 
 Scenario: live sanity check (one/two/three sent into one chat; relay toggles on) plus controlled repro with the new debug traces (`d1e024d`): ONE alone — nothing relayed; series — first message missing, remainder relayed; repeated 3×, also with 4 messages.
 
@@ -145,7 +145,7 @@ Expected / observed:
 
 Fix (commit after `d1e024d`): `MessageTracker` cursors now also carry the newest relayed message timestamp. Shrink snapshots classify entries by per-message timestamp: strictly newer than the relaid watermark → emitted (rebuilt fresh arrays relay their content); older-or-equal → already-relayed leftovers, silent. Entries without timestamps keep conservative behavior. Battery for WristRelay: "Optimized" (stock).
 
-Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format only: POSTED len/counts, RELAY emitted counts, key `0|org.telegram.messenger|386558704|null|10278`); no message content.
+Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format only: POSTED len/counts, RELAY emitted counts, key `0|org.telegram.messenger|<notification-id>|null|<uid>`; exact numeric id/uid withheld as identifying); no message content.
 
 Result: Pass — fix verified on device (owner re-test on build `2c20760`): a lone ONE relays again, and ONE/TWO/THREE all arrive as independent entries after the array rebuild.
 
@@ -153,7 +153,7 @@ Go/No-Go and outstanding issues: swallow resolved. Open limitation recorded: lat
 
 ### 2026-10-13 — Task 3.1 watch presentation (partial, owner-decided scope)
 
-Date and versions: Pixel 8 + vívoactive 5 + Garmin Connect; relay build with all Epic 2 fixes installed and in daily use since 2026-10-13.
+Date and versions: Android phone + Garmin watch + Garmin Connect; relay build with all Epic 2 fixes installed and in daily use since 2026-10-13.
 
 Scenario and configuration: relay toggles on; silent relay channel; Telegram forwarding off / WristRelay on in Garmin Connect (owner 0.3 setup unchanged).
 
@@ -172,7 +172,7 @@ Go/No-Go and outstanding issues: owner decision 2026-10-13 — the remaining wat
 
 ### 2026-10-13 — Task 2.4 owner evidence run R1–R6
 
-Date and versions: Pixel 8 + vívoactive 5 + Garmin Connect; WristRelay with the timestamp-classification fix (`2c20760`+); battery stock "Optimized".
+Date and versions: Android phone + Garmin watch + Garmin Connect; WristRelay with the timestamp-classification fix (`2c20760`+); battery stock "Optimized".
 
 Scenario and configuration: relay toggles on; R1–R6 per the script above; synthetic vocabulary only.
 
