@@ -35,9 +35,9 @@ Fix (commit after `d1e024d`): `MessageTracker` cursors now also carry the newest
 
 Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format only: POSTED len/counts, RELAY emitted counts, key `0|org.telegram.messenger|386558704|null|10278`); no message content.
 
-Result: fix implemented; pending owner re-verification on the fixed build.
+Result: Pass — fix verified on device (owner re-test on build `2c20760`): a lone ONE relays again, and ONE/TWO/THREE all arrive as independent entries after the array rebuild.
 
-Go/No-Go and outstanding issues: re-shadow the sanity check (one/two/three → expect three relay entries incl. the first) before running the R1–R6 evidence script. Open limitation recorded: late-arriving offline messages whose per-message timestamp is older than the watermark are treated as already-relayed and stay silent.
+Go/No-Go and outstanding issues: swallow resolved. Open limitation recorded: late-arriving offline messages whose per-message timestamp is older than the watermark are treated as already-relayed and stay silent. R1–R6 evidence script pending owner.
 
 ### Task 2.4 owner run script (pending — feeds ADR-008 cleanup decision)
 
