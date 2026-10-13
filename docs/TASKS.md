@@ -35,3 +35,7 @@ Epic 0 is the critical gate and blocks production relay work (encoded as a Dart 
 | uOR5w1ntEE9d | [3.1 — Validate watch presentation, reconnect and app filtering](https://app.dartai.com/t/uOR5w1ntEE9d-3-1-Validate-watch-presentatio) |
 | Ic9YTglOwQbm | [3.2 — Audit security and performance](https://app.dartai.com/t/Ic9YTglOwQbm-3-2-Audit-security-and-perform) |
 | ZmiayPuFgdjE | [3.3 — Prepare controlled release and finalize user docs](https://app.dartai.com/t/ZmiayPuFgdjE-3-3-Prepare-controlled-release) |
+| htkZ8SyW954a | [3.4 — Sanitize repository docs of personal/identifying data before public release](https://app.dartai.com/t/htkZ8SyW954a-3-4-Sanitize-repository-docs) |
+| gTVd1XgrDfEn | [3.5 — Consumer-friendly UI: minimal controls, icon-theme colors, debug capture out of the consumer surface](https://app.dartai.com/t/gTVd1XgrDfEn-3-5-Consumer-friendly-UI-minim) |
+
+Board closure state (2026-10-13): Epics 0–2 done; Epic 3 subtasks 3.1/3.2 done with evidence comments; 3.3 deferred to a new session pending owner decisions (release signing location; device version numbers for release docs); 3.4 and 3.5 are new pre-release hygiene/design tasks — 3.4 must complete before any public release.
