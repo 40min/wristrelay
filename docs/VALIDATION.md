@@ -83,6 +83,24 @@ Result: Pass
 
 Go/No-Go and outstanding issues: phone-side acceptance met (proves extraction + independent publication). No Go/No-Go yet — Garmin Connect mirroring and watch readability are task 0.3. Open items: unexplained one-off missed message; silent-channel mirroring unverified; package variants beyond `org.telegram.messenger` unverified.
 
+### 2026-10-13 — Task 0.3 Garmin Connect filtering and Phase 0 Go/No-Go
+
+Date and versions: Pixel 8 + Garmin vívoactive 5 + Garmin Connect; exact OS/Connect/firmware versions not yet recorded (open follow-up).
+
+Scenario and configuration: task 0.3 owner setup — in Garmin Connect the owner disabled Telegram app forwarding, enabled WristRelay, left other apps unchanged; Telegram phone notification settings untouched.
+
+Expected / observed:
+
+- Owner test: ONE, TWO, THREE each arrived on the vívoactive 5 as a separate, independent entry, each with vibration, correct synthetic text.
+- After the six phone-side entries (Telegram's own + WristRelay's), the watch received exactly the WristRelay entries — no Telegram duplicates on the watch, consistent with the intended app-filtering split (owner: "doubled delivery on mobile from Telegram and WristRelay, as expected"; watch confirmation of no Telegram entries pending owner's explicit recheck).
+- Telegram phone notifications preserved.
+
+Sanitized evidence: owner's report of 2026-10-13 (quoted above, verified in session log); no private content.
+
+Result: Pass
+
+Go/No-Go and outstanding issues: **Go** — owner declared Phase 0 success: correct text, vibration, all three entries independently browsable. Production relay work (Epic 2, blocked via task 2.1) may start. Open items: record the exact Connect settings menu path and Connect version; explicit confirmation that Telegram itself produced no watch entries; suitable silence later against watch forwarding is a 2.2/3.1 concern.
+
 ### Template for future runs
 
 Date and versions:
