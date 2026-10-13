@@ -26,7 +26,7 @@ Fixture statements (unit-tested, synthetic vocabulary only) vs. device-unverifie
 
 - Verified on device in 0.1/0.2 and now fixture-covered: cumulative in-place updates, identical consecutive texts, individual chat shapes, per-message senders in groups, array-order authority.
 - Fixture-covered but never observed in a real Telegram snapshot (behavior defined by fixtures until device evidence exists): legacy plain-string `sender` payloads, `Int`-shaped per-message `time`, missing title/group flag, media-only or text-less entries interspersed with real messages, non-Bundle array elements, summary-style snapshots without `EXTRA_MESSAGES`, out-of-order per-message timestamps, array reset-shrinks (proven 0.2 for shrink handling in MessageTracker).
-- Media-only messages are skipped: an image/sticker arrival produces no watch entry unless Telegram also includes a caption text. Improving this would require a device fixture; record one before changing the skip rule.
+- Media-only messages are skipped: an image/sticker arrival produces no watch entry unless Telegram also includes a caption text. Improving this would require a device fixture; per owner decision (2026-10-13) the group/media shapes are not reproduced on demand — they are left to live daily use, and any discovered issue is reported as a separate bug.
 - Whole-conversation summaries and unsupported shapes emit nothing and are not read evidence; the MessageTracker cursor is untouched (ADR-008).
 - Telegram X (`org.telegram.messenger.x` or similar) remains unverified; only `org.telegram.messenger` is supported by the package gate.
 
