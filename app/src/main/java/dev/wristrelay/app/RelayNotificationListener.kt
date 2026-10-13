@@ -121,7 +121,7 @@ class RelayNotificationListener : NotificationListenerService() {
     private fun trackSeenBaseline(sbn: StatusBarNotification) {
         if (!TelegramExtractor.matches(sbn.packageName)) return
         val snapshot = TelegramExtractor.extract(sbn) ?: return
-        tracker?.markBaseline(sbn.key, snapshot.size)
+        tracker?.markBaseline(sbn.key, snapshot)
         DebugRecorder.baselineAbsorbed(sbn.key, snapshot.size, TelegramExtractor.TELEGRAM_PACKAGE)
     }
 }

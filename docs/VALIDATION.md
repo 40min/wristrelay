@@ -20,6 +20,25 @@ Pass only if all three remain independently accessible. If Connect or the watch 
 3. Owner opens WristRelay's debug screen, taps Refresh and records the sanitized lines shown (they contain package/user/key/timing/extra-shape only — safe to share).
 4. Repeat for: first message in a chat, second message in the same chat (update), third message, and after clearing the chat. Note POSTED vs REMOVED lines.
 
+### 2026-10-13 — Task 2.4 finding: first-of-series message swallowed (diagnosis + fix)
+
+Date and versions: Pixel 8, `org.telegram.messenger`, WristRelay build with tasks 2.1–2.3 (`4345edb`).
+
+Scenario: live sanity check (one/two/three sent into one chat; relay toggles on) plus controlled repro with the new debug traces (`d1e024d`): ONE alone — nothing relayed; series — first message missing, remainder relayed; repeated 3×, also with 4 messages.
+
+Expected / observed:
+
+- Telegram phone-side showed all entries cumulatively (`android.messages` len 1→2→3); WristRelay relayed only the 2nd+ messages. Trace pattern with zero `CONNECT`/`BASELINE` lines: `RELAY extracted=1 emitted=0` for the first, then emitted=1 — so no listener rebind; the tracker's positional cursor treated Telegram's rebuilt fresh array (smaller than the previous series) as "shrink = read", swallowing the genuinely new message inside it.
+- Root cause: Telegram rebuilds the cumulative array from scratch at times (device-verified behavior); positional-only detection cannot distinguish rebuilt-new-content from unread-old-leftovers.
+
+Fix (commit after `d1e024d`): `MessageTracker` cursors now also carry the newest relayed message timestamp. Shrink snapshots classify entries by per-message timestamp: strictly newer than the relaid watermark → emitted (rebuilt fresh arrays relay their content); older-or-equal → already-relayed leftovers, silent. Entries without timestamps keep conservative behavior. Battery for WristRelay: "Optimized" (stock).
+
+Sanitized evidence: debug trace quoted by the owner 2026-10-13 (metadata/format only: POSTED len/counts, RELAY emitted counts, key `0|org.telegram.messenger|386558704|null|10278`); no message content.
+
+Result: fix implemented; pending owner re-verification on the fixed build.
+
+Go/No-Go and outstanding issues: re-shadow the sanity check (one/two/three → expect three relay entries incl. the first) before running the R1–R6 evidence script. Open limitation recorded: late-arriving offline messages whose per-message timestamp is older than the watermark are treated as already-relayed and stay silent.
+
 ### Task 2.4 owner run script (pending — feeds ADR-008 cleanup decision)
 
 Run once during live daily use, relay toggles on, tokens ONE/TWO/THREE/OK only. Each answer is two facts: what survived, and yes/no REMOVED line in the debug screen. No message content.

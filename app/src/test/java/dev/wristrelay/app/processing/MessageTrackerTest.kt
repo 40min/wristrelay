@@ -10,12 +10,13 @@ import org.junit.Test
  */
 class MessageTrackerTest {
 
-    private fun message(text: String, sender: String = "sender-a") =
+    private fun message(text: String, sender: String = "sender-a", time: Long? = null) =
         RelayMessage(
             conversationTitle = "conv-one",
             isGroup = false,
             sender = sender,
             text = text,
+            timestampMs = time,
         )
 
     private val convKey = "0|org.telegram.messenger|386558704|null|10278"
@@ -116,7 +117,10 @@ class MessageTrackerTest {
         // Process restart / listener rebind: fresh state, current snapshot
         // becomes the silent baseline — no replay, then growth relays again.
         val restarted = MessageTracker()
-        restarted.markBaseline(convKey, 3)
+        restarted.markBaseline(
+            convKey,
+            listOf(message("one"), message("two"), message("three")),
+        )
         assertEquals(
             emptyList<Any>(),
             restarted.newMessages(
@@ -136,7 +140,7 @@ class MessageTrackerTest {
     @Test
     fun `baseline on smaller current snapshot resumes from current`() {
         val restarted = MessageTracker()
-        restarted.markBaseline(convKey, 1)
+        restarted.markBaseline(convKey, listOf(message("one")))
         assertEquals(
             listOf("two", "three"),
             restarted.newMessages(
@@ -149,9 +153,139 @@ class MessageTrackerTest {
     @Test
     fun `zero baseline keeps nothing tracked`() {
         val restarted = MessageTracker()
-        restarted.markBaseline(convKey, 0)
-        restarted.markBaseline(convKey, -1)
+        restarted.markBaseline(convKey, emptyList())
+        restarted.markBaseline(convKey, listOf())
         // No cursor retained, so the first real snapshot relays normally.
         assertEquals(listOf("one"), restarted.newMessages(convKey, listOf(message("one"))).map { it.text })
+    }
+
+    @Test
+    fun `telegram array rebuild with a newer entry is emitted instead of swallowed`() {
+        // Owner repro 2026-10-13: relay through a series, then Telegram
+        // rebuilds the array fresh with only the newest message inside.
+        val tracker = MessageTracker()
+        tracker.newMessages(
+            convKey,
+            listOf(
+                message("one", time = 1000),
+                message("two", time = 2000),
+                message("three", time = 3000),
+            ),
+        )
+        val rebuilt = listOf(message("next", time = 4000))
+        assertEquals(
+            listOf("next"),
+            tracker.newMessages(convKey, rebuilt).map { it.text },
+        )
+        // Growth after the rebuilt snapshot keeps relaying.
+        tracker.newMessages(convKey, rebuilt)
+        assertEquals(
+            listOf("after"),
+            tracker.newMessages(
+                convKey,
+                listOf(message("next", time = 4000), message("after", time = 5000)),
+            ).map { it.text },
+        )
+    }
+
+    @Test
+    fun `shrink to older already-relayed leftovers emits nothing`() {
+        val tracker = MessageTracker()
+        tracker.newMessages(
+            convKey,
+            listOf(
+                message("one", time = 1000),
+                message("two", time = 2000),
+                message("three", time = 3000),
+            ),
+        )
+        // Telegram shrinks the unread array to older entries only (often
+        // after the phone side read newer ones): treated as read.
+        assertEquals(
+            emptyList<Any>(),
+            tracker.newMessages(convKey, listOf(message("older-still-unread", time = 2000))),
+        )
+        // Successive smaller snapshots stay silent as well.
+        assertEquals(
+            emptyList<Any>(),
+            tracker.newMessages(convKey, listOf(message("older-still-unread", time = 2000))),
+        )
+    }
+
+    @Test
+    fun `shrink with leftovers plus newer entry emits only the newer part`() {
+        val tracker = MessageTracker()
+        tracker.newMessages(
+            convKey,
+            listOf(
+                message("one", time = 1000),
+                message("two", time = 2000),
+                message("three", time = 3000),
+            ),
+        )
+        assertEquals(
+            listOf("brand-new"),
+            tracker.newMessages(
+                convKey,
+                listOf(message("two", time = 2000), message("brand-new", time = 9000)),
+            ).map { it.text },
+        )
+        // The cursor advanced over the whole snapshot: the leftover older
+        // entry is not re-emitted later even though the array keeps it.
+        assertEquals(
+            emptyList<Any>(),
+            tracker.newMessages(convKey, listOf(message("two", time = 2000), message("brand-new", time = 9000))),
+        )
+    }
+
+    @Test
+    fun `late arrival carrying an older timestamp stays silent documented limitation`() {
+        val tracker = MessageTracker()
+        tracker.newMessages(convKey, listOf(message("one", time = 5000)))
+        // An offline-sent message arrives with a timestamp older than the
+        // newest relayed one: classified as already-relayed rather than
+        // re-emitted (documented limitation, see VALIDATION.md).
+        assertEquals(
+            emptyList<Any>(),
+            tracker.newMessages(convKey, listOf(message("old-queued", time = 1000))),
+        )
+    }
+
+    @Test
+    fun `entries without timestamps keep conservative shrink behavior`() {
+        val tracker = MessageTracker()
+        tracker.newMessages(
+            convKey,
+            listOf(
+                message("one", time = 1000),
+                message("two", time = 2000),
+            ),
+        )
+        assertEquals(
+            emptyList<Any>(),
+            tracker.newMessages(convKey, listOf(message("untimestamped"))),
+        )
+        // Growth after the conservative collapse still relays normally.
+        assertEquals(
+            listOf("grown"),
+            tracker.newMessages(
+                convKey,
+                listOf(message("untimestamped"), message("grown", time = 4000)),
+            ).map { it.text },
+        )
+    }
+
+    @Test
+    fun `baseline records timestamps so later rebuilds classify correctly`() {
+        val restarted = MessageTracker()
+        restarted.markBaseline(convKey, listOf(message("history", time = 1000), message("history", time = 3000)))
+        assertEquals(
+            emptyList<Any>(),
+            restarted.newMessages(convKey, listOf(message("older", time = 2000))),
+        )
+        assertEquals(
+            listOf("newer"),
+            restarted.newMessages(convKey, listOf(message("newer", time = 4000))).map { it.text },
+        )
     }
 }
