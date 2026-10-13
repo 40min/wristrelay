@@ -101,4 +101,57 @@ class MessageTrackerTest {
             tracker.newMessages("conv-key-a", listOf(message("one"), message("one"))).map { it.text },
         )
     }
+
+    @Test
+    fun `baseline resets replay after restart or rebind`() {
+        // Process life one: three messages relayed.
+        val firstRun = MessageTracker()
+        assertEquals(
+            listOf("one", "two", "three"),
+            firstRun.newMessages(
+                convKey,
+                listOf(message("one"), message("two"), message("three")),
+            ).map { it.text },
+        )
+        // Process restart / listener rebind: fresh state, current snapshot
+        // becomes the silent baseline — no replay, then growth relays again.
+        val restarted = MessageTracker()
+        restarted.markBaseline(convKey, 3)
+        assertEquals(
+            emptyList<Any>(),
+            restarted.newMessages(
+                convKey,
+                listOf(message("one"), message("two"), message("three")),
+            ),
+        )
+        assertEquals(
+            listOf("four"),
+            restarted.newMessages(
+                convKey,
+                listOf(message("one"), message("two"), message("three"), message("four")),
+            ).map { it.text },
+        )
+    }
+
+    @Test
+    fun `baseline on smaller current snapshot resumes from current`() {
+        val restarted = MessageTracker()
+        restarted.markBaseline(convKey, 1)
+        assertEquals(
+            listOf("two", "three"),
+            restarted.newMessages(
+                convKey,
+                listOf(message("one"), message("two"), message("three")),
+            ).map { it.text },
+        )
+    }
+
+    @Test
+    fun `zero baseline keeps nothing tracked`() {
+        val restarted = MessageTracker()
+        restarted.markBaseline(convKey, 0)
+        restarted.markBaseline(convKey, -1)
+        // No cursor retained, so the first real snapshot relays normally.
+        assertEquals(listOf("one"), restarted.newMessages(convKey, listOf(message("one"))).map { it.text })
+    }
 }

@@ -20,6 +20,19 @@ Pass only if all three remain independently accessible. If Connect or the watch 
 3. Owner opens WristRelay's debug screen, taps Refresh and records the sanitized lines shown (they contain package/user/key/timing/extra-shape only — safe to share).
 4. Repeat for: first message in a chat, second message in the same chat (update), third message, and after clearing the chat. Note POSTED vs REMOVED lines.
 
+### Task 2.4 owner run script (pending — feeds ADR-008 cleanup decision)
+
+Run once during live daily use, relay toggles on, tokens ONE/TWO/THREE/OK only. Each answer is two facts: what survived, and yes/no REMOVED line in the debug screen. No message content.
+
+- R1 — Source removal vs unread watch entries (ADR-008 core evidence): receive TWO and leave it unread; swipe away only Telegram's phone notification; record whether the WristRelay relay entry for TWO survives on the phone and on the watch, and whether a REMOVED line for the Telegram key appears in the debug screen.
+- R2 — System clear-all: with THREE unread (Telegram entry + relay entry visible), press the system clear-all; record which entries vanished and whether the watch copies remain.
+- R3 — Dismissal as explicit cleanup: with TWO unread on the watch, swipe away WristRelay's relay entry on the phone; record whether the watch copy disappears too.
+- R4 — Restart/rebind: force-stop WristRelay (or reboot), then send OK; record (a) whether OK relays exactly once, (b) no replay of older entries, (c) the first RELAY line after reconnect (`extracted=N emitted=0`). Note: OK arriving while the listener is down is expected to be swallowed by the connect baseline (documented limitation, no replay storm by design).
+- R5 — Access revoke/regrant: revoke Notification Access, record the status line and that nothing crashes; re-grant, send OK, expect exactly one relay entry and no replay.
+- R6 — Posting revoke/regrant: revoke POST_NOTIFICATIONS (Android 13+), send OK (needs the synthetic-message helper from step 0.x), record that Telegram works but no relay entry appears and the app does not crash; re-grant, send OK again, relay resumes exactly once.
+
+Results decide the automatic cleanup policy (never cancel Telegram; the policy must protect unread watch entries — ADR-008).
+
 ### Task 2.3 persistent settings (open device item)
 
 Owner live check: after reinstall, toggles survive a process kill and app relaunch; the "Send test relay notification" button posts one silent-channel entry (watch mirrors it); the guide maps to what the owner's Connect version actually shows (record exact menu path per the 0.3 follow-up).
