@@ -2,7 +2,9 @@
 
 ## Current implementation
 
-One `app` Gradle module with Kotlin and Compose. A launcher screen provides notification permission controls. The manifest registers a notification listener guarded by Android's binding permission. The listener is intentionally inert: no message extraction, retention or publication.
+One `app` Gradle module with Kotlin and Compose. A launcher screen provides notification permission controls plus a Phase 0 debug section (Refresh/Clear) that shows sanitized notification metadata captured by the listener. The manifest registers a notification listener guarded by Android's binding permission.
+
+Phase 0 debug capture only: `RelayNotificationListener` records external posted/removed events (ignoring WristRelay itself) into a bounded in-memory store (`DebugEventStore`, max 50 entries, process-lifetime only). Each record is metadata-only: package, user, key, timing, ongoing flag and extra summaries that reduce string/char-sequence values to type and length. Message bodies, titles and sender names are never read into retained state; the store is not persisted or logged. The listener performs no extraction or relay yet.
 
 ## Intended pipeline
 

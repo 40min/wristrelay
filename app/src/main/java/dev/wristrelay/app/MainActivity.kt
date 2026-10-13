@@ -12,25 +12,34 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.core.app.NotificationManagerCompat
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import dev.wristrelay.app.debug.DebugEvent
+import dev.wristrelay.app.debug.DebugEventStore
+import dev.wristrelay.app.debug.DebugFormat
 
 class MainActivity : ComponentActivity() {
     private val postingAllowed = mutableStateOf(false)
     private val listenerAccessGranted = mutableStateOf(false)
+    private val captured = mutableStateListOf<DebugEvent>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +68,36 @@ class MainActivity : ComponentActivity() {
                                 permissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }) { Text("Allow notification posting") }
                         }
+
+                        Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
+                        Text("Sanitized notification metadata from external apps; no text content, bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), cleared when the app process dies.")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                captured.clear()
+                                captured.addAll(DebugEventStore.snapshot())
+                            }) { Text("Refresh") }
+                            OutlinedButton(onClick = {
+                                DebugEventStore.clear()
+                                captured.clear()
+                            }) { Text("Clear") }
+                        }
+                        captured.forEach { event ->
+                            val lines = DebugFormat.format(event)
+                            Column(
+                                modifier = Modifier.padding(start = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                lines.forEach { line ->
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        softWrap = false,
+                                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -68,6 +107,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshPermission()
+        captured.clear()
+        captured.addAll(DebugEventStore.snapshot())
     }
 
     private fun refreshPermission() {

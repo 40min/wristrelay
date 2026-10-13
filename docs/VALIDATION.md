@@ -11,7 +11,14 @@ Status: not performed. Record device OS, Telegram package/version, Garmin Connec
 5. Publish three independent WristRelay entries.
 6. Confirm correct text and intended alerts, then browse all three on vívoactive 5.
 
-Pass only if all three remain independently accessible. If Connect or the watch groups/suppresses entries, investigate notification IDs/tags/channels/grouping before declaring Go. The skeleton does not implement steps 3–5 yet.
+Pass only if all three remain independently accessible. If Connect or the watch groups/suppresses entries, investigate notification IDs/tags/channels/grouping before declaring Go. The skeleton implements metadata-only debug capture (step 3–5 behavior is not implemented yet); its debug screen is the evidence source for step 4.
+
+### Task 0.1 metadata inspection
+
+1. Owner installs the debug APK and grants Notification Access to WristRelay.
+2. Owner posts notifications externally (Telegram and, to see the listener working for sure, any other app such as a messaging app or a test tool).
+3. Owner opens WristRelay's debug screen, taps Refresh and records the sanitized lines shown (they contain package/user/key/timing/extra-shape only — safe to share).
+4. Repeat for: first message in a chat, second message in the same chat (update), third message, and after clearing the chat. Note POSTED vs REMOVED lines.
 
 ## Reliability matrix
 

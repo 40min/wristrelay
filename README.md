@@ -35,7 +35,7 @@ Telegram keeps its normal phone notifications. In Garmin Connect, users disable 
 
 ## Current status
 
-**Project skeleton — Telegram relaying is not implemented yet.** The app has a minimal Compose screen, notification permission controls and an inert notification-listener service. There is no parser, message tracker or relay engine yet.
+**Project skeleton — Telegram relaying is not implemented yet.** The app has a minimal Compose screen, notification permission controls and a notification-listener service that records metadata-only debug captures (no text content, bounded in-memory history). There is no parser, message tracker or relay engine yet.
 
 The first milestone is a feasibility APK tested on Pixel 8 and vívoactive 5: the watch must show **ONE, TWO, THREE**, and all three must remain independently browsable. Production relay development depends on that result. Watch compatibility and battery targets are not yet verified.
 
