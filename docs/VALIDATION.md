@@ -63,9 +63,27 @@ Result: Pass
 
 Go/No-Go and outstanding issues: not yet a Go/No-Go (that is task 0.3). Outstanding: (1) other Telegram package variants (e.g. Telegram X) unverified — only `org.telegram.messenger` installed; (2) device OS/Telegram/Garmin Connect versions not recorded; (3) per-message bundle internals (stable message identity keys) not yet inspected — the extractor must treat messages as unnamed, positionally identified entries and confirm which identity keys exist during 0.2 verification.
 
-### Next runs
+### 2026-10-13 — Task 0.2 relay prototype (phone-side)
 
-Fill this template for each new device run:
+Date and versions: Pixel 8, Telegram `org.telegram.messenger`, WristRelay task 0.2 prototype build (commits `407b88b`…`8847a06`); exact app versions not yet recorded.
+
+Scenario and configuration: relay toggle on, notification access granted, synthetic ONE/TWO/THREE/OK messages into one Telegram chat without opening Telegram; metadata-only relay trace enabled.
+
+Expected / observed:
+
+- ONE/TWO/THREE each produced a separate, unchanged WristRelay notification; Telegram's own notification remained untouched. Owner confirmed texts correct.
+- Trace evidence: `extracted=2 emitted=1 published=1` (baseline prevented replay of the leftover chat entry), then a snapshot with a **fresh one-entry messaging array** mid-session (`extracted=1 emitted=0`) treated correctly as shrink/read; growth after reset (`extracted=2 emitted=1 published=1`) delivered TWO.
+- Identical texts (`OK`, `OK`) → two separate WristRelay entries, both delivered (owner-confirmed).
+- One earlier anomaly (first prototype build): TWO was not relayed once; not reproduced on the trace build; recorded as unexplained, possibly listener rebinding at toggle time. Watch for repeats in 0.3/1.x validation.
+- Phone channel is deliberately non-silent; owner's phone was in permanent silent mode, so channel sound behavior is inconclusive (recorded as an open item for 3.1).
+
+Sanitized evidence: trace (`RELAY` lines with counts only) and POSTED metadata records in the owner's report of 2026-10-13; no message content in logs.
+
+Result: Pass
+
+Go/No-Go and outstanding issues: phone-side acceptance met (proves extraction + independent publication). No Go/No-Go yet — Garmin Connect mirroring and watch readability are task 0.3. Open items: unexplained one-off missed message; silent-channel mirroring unverified; package variants beyond `org.telegram.messenger` unverified.
+
+### Template for future runs
 
 Date and versions:
 
