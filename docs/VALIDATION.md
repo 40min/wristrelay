@@ -40,7 +40,32 @@ Pass only if all three remain independently accessible. If Connect or the watch 
 
 Measure typical/burst processing and 24-hour idle/daily workload under stock battery restrictions. Targets are <20ms typical processing, <30MB normal memory, additional battery aim <1% per day, negligible idle CPU and zero app network traffic. Record actual results, measurement method and deviations; do not present targets as achievements.
 
-## Run record template
+## Run log
+
+### 2026-10-13 — Task 0.1 Telegram metadata inspection
+
+Date and versions: Pixel 8, Telegram `org.telegram.messenger` (exact OS/Telegram/Connect versions not yet recorded — see outstanding items).
+
+Scenario and configuration: WristRelay debug capture installed, Notification Access granted; synthetic messages sent into one Telegram chat without opening Telegram; debug screen refreshed between sends.
+
+Expected / observed:
+
+- One phone notification per chat expected; three POSTED events captured for ONE/TWO/THREE, all with the identical key `0|org.telegram.messenger|386558704|null|10278` and no intervening REMOVED — Telegram updates one notification in place and reuses the id.
+- `android.messages: Parcelable[]` grows 1→2→3 (cumulative MessagingStyle); `android.text` len 3/3/5; `conversationUnreadMessageCount` len=1 while its value changes (1→2→3).
+- Conversation metadata present and constant: `android.title` (len 12), `android.isGroupConversation`, `android.people.list`, `android.selfDisplayName`.
+- REMOVED event for the same key carries a stripped extras bundle (conversationUnreadMessageCount/isGroupConversation/progress only) — removal metadata is not a reduced copy of the content.
+- Identical-text test: two OKs in one chat produced two POSTED updates (`android.messages` len 3→4), each arrival one new array entry; the texts were merged into the single phone notification.
+- Capture mechanism proven for an external app (`com.microsoft.skydrive` POSTED, full shape). Capture delay consistently ~280–310ms after postTime.
+
+Sanitized evidence: full POSTED/REMOVED metadata records (package/user/key/timing/extra key-type-length summaries, no message text) recorded in the owner's report of 2026-10-13 and summarized in the Dart task comment.
+
+Result: Pass
+
+Go/No-Go and outstanding issues: not yet a Go/No-Go (that is task 0.3). Outstanding: (1) other Telegram package variants (e.g. Telegram X) unverified — only `org.telegram.messenger` installed; (2) device OS/Telegram/Garmin Connect versions not recorded; (3) per-message bundle internals (stable message identity keys) not yet inspected — the extractor must treat messages as unnamed, positionally identified entries and confirm which identity keys exist during 0.2 verification.
+
+### Next runs
+
+Fill this template for each new device run:
 
 Date and versions:
 
