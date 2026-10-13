@@ -74,9 +74,45 @@ class RelayNotificationListener : NotificationListenerService() {
         val tracker = tracker ?: return
         val publisher = publisher ?: return
 
-        val snapshot = TelegramExtractor.extract(sbn) ?: return
-        val fresh = tracker.newMessages(sbn.key, snapshot)
-        if (fresh.isNotEmpty()) publisher.publish(fresh)
+        val key = sbn.key
+        val snapshot = TelegramExtractor.extract(sbn)
+        if (snapshot == null) {
+            debugTrace(key, "extract=null (unsupported/missing messaging array)")
+            return
+        }
+        val fresh = try {
+            tracker.newMessages(key, snapshot)
+        } catch (t: Throwable) {
+            debugTrace(key, "tracker failed: ${t.javaClass.simpleName}")
+            return
+        }
+        if (fresh.isEmpty()) {
+            debugTrace(key, "extracted=${snapshot.size} emitted=0")
+            return
+        }
+        try {
+            publisher.publish(fresh)
+            debugTrace(key, "extracted=${snapshot.size} emitted=${fresh.size} published=${fresh.size}")
+        } catch (t: Throwable) {
+            debugTrace(key, "publish failed after emitting ${fresh.size}: ${t.javaClass.simpleName}")
+        }
+    }
+
+    private fun debugTrace(key: String?, trace: String) {
+        DebugEventStore.append(
+            DebugEvent(
+                seq = debugSequence.incrementAndGet(),
+                wallClockMs = System.currentTimeMillis(),
+                action = "RELAY",
+                packageName = TelegramExtractor.TELEGRAM_PACKAGE,
+                userId = 0,
+                key = key ?: "unknown",
+                isOngoing = false,
+                postTimeMs = -1L,
+                extras = emptyList(),
+                relayTrace = trace,
+            ),
+        )
     }
 
     private fun trackSeenBaseline(sbn: StatusBarNotification) {

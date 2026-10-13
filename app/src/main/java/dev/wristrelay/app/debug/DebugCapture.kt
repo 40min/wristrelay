@@ -19,6 +19,7 @@ data class DebugEvent(
     val isOngoing: Boolean,
     val postTimeMs: Long,
     val extras: List<ExtraSummary>,
+    val relayTrace: String? = null,
 )
 
 /** Key plus sanitized shape of one notification extra. */
@@ -90,6 +91,10 @@ object DebugFormat {
     fun format(event: DebugEvent): List<String> = buildList {
         add("${event.action} pkg=${event.packageName} user=${event.userId} ongoing=${event.isOngoing}")
         add("key=${event.key}")
+        if (event.relayTrace != null) {
+            add("relayTrace=${event.relayTrace}")
+            return@buildList
+        }
         add(describeTimestamps(event.postTimeMs, event.wallClockMs))
         if (event.extras.isEmpty()) {
             add("extras=none")
