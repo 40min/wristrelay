@@ -2,9 +2,11 @@
 
 ## Current implementation
 
-One `app` Gradle module with Kotlin and Compose. A launcher screen provides notification permission controls plus a Phase 0 debug section (Refresh/Clear) that shows sanitized notification metadata captured by the listener. The manifest registers a notification listener guarded by Android's binding permission.
+One `app` Gradle module with Kotlin and Compose. A launcher screen provides notification permission controls, a task 0.2 prototype relay toggle (in-memory, off by default) and a Phase 0 debug section showing sanitized notification metadata captured by the listener. The manifest registers a notification listener guarded by Android's binding permission.
 
-Phase 0 debug capture only: `RelayNotificationListener` records external posted/removed events (ignoring WristRelay itself) into a bounded in-memory store (`DebugEventStore`, max 50 entries, process-lifetime only). Each record is metadata-only: package, user, key, timing, ongoing flag and extra summaries that reduce string/char-sequence values to type and length. Message bodies, titles and sender names are never read into retained state; the store is not persisted or logged. The listener performs no extraction or relay yet.
+Phase 0 debug capture only: `RelayNotificationListener` records external posted/removed events (ignoring WristRelay itself) into a bounded in-memory store (`DebugEventStore`, max 50 entries, process-lifetime only). Each record is metadata-only: package, user, key, timing, ongoing flag and extra summaries that reduce string/char-sequence values to type and length. Message bodies, titles and sender names are never read into retained state; the store is not persisted or logged.
+
+Prototype relay (task 0.2, off by default): for Telegram snapshots only (`org.telegram.messenger`, verified variant on the owner's Pixel 8), `TelegramExtractor` reads the cumulative MessagingStyle `EXTRA_MESSAGES` array and `MessageTracker` diffs it positionally against a bounded per-conversation cursor (no stable per-message identity exists — verified 0.1). `RelayNotificationPublisher` posts exactly one independent notification per genuinely new message with unique never-reused ids/tags; source Telegram notifications are never cancelled or modified. `onListenerConnected` establishes a silent baseline so reconnects never replay stale conversations. The relay channel is deliberately not silent: watch mirroring of silent notifications is unverified (silence will be validated separately as part of the task 2.2 effort).
 
 ## Intended pipeline
 

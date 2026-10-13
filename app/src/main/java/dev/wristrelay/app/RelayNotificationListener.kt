@@ -7,20 +7,34 @@ import dev.wristrelay.app.debug.DebugEvent
 import dev.wristrelay.app.debug.DebugEventStore
 import dev.wristrelay.app.debug.DebugFormat
 import dev.wristrelay.app.debug.ExtraKind
+import dev.wristrelay.app.processing.MessageTracker
+import dev.wristrelay.app.relay.RelayNotificationPublisher
+import dev.wristrelay.app.settings.PrototypeRelaySwitch
+import dev.wristrelay.app.source.telegram.TelegramExtractor
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Task 0.1 fixture collector: records sanitized, metadata-only snapshots of
- * external notifications (WristRelay's own are ignored) while the process
- * runs. Notification and extra values are never read — only extra keys,
- * discriminated types and string/array lengths — so no message content can
- * leak into retained state. Retention is bounded in memory and cleared when
- * the process dies.
- *
- * The production filtering/extraction pipeline is a later task; this listener
- * performs no parsing, publication or cleanup on captured notifications.
+ * Debug capture (metadata-only, bounded; never reads message contents) plus
+ * the task 0.2 prototype relay: extracts MessagingStyle messages from
+ * Telegram snapshots and publishes one independent notification per genuinely
+ * new message. Filtering happens first and unrelated packages never proceed
+ * beyond the gate. WristRelay's own notifications are always excluded.
  */
 class RelayNotificationListener : NotificationListenerService() {
+
+    private val debugSequence = AtomicLong(0)
+    private var tracker: MessageTracker? = null
+    private var publisher: RelayNotificationPublisher? = null
+
+    override fun onListenerConnected() {
+        tracker = MessageTracker()
+        publisher = RelayNotificationPublisher(this)
+        // Baseline current state without relaying, so a listener reconnect or
+        // process restart never replays stale conversations (VALIDATION.md).
+        activeNotifications?.forEach { sbn ->
+            trackSeenBaseline(sbn)
+        }
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) = record("POSTED", sbn)
 
@@ -28,7 +42,11 @@ class RelayNotificationListener : NotificationListenerService() {
 
     private fun record(action: String, sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
+        recordDebugCapture(action, sbn)
+        if (action == "POSTED") handleRelayCandidate(sbn)
+    }
 
+    private fun recordDebugCapture(action: String, sbn: StatusBarNotification) {
         val extras: Bundle = sbn.notification?.extras ?: Bundle.EMPTY
         val summarized = extras.keySet().orEmpty()
             .sorted()
@@ -37,7 +55,7 @@ class RelayNotificationListener : NotificationListenerService() {
 
         DebugEventStore.append(
             DebugEvent(
-                seq = sequence.incrementAndGet(),
+                seq = debugSequence.incrementAndGet(),
                 wallClockMs = System.currentTimeMillis(),
                 action = action,
                 packageName = sbn.packageName,
@@ -48,6 +66,23 @@ class RelayNotificationListener : NotificationListenerService() {
                 extras = summarized,
             ),
         )
+    }
+
+    private fun handleRelayCandidate(sbn: StatusBarNotification) {
+        if (!TelegramExtractor.matches(sbn.packageName)) return
+        if (!PrototypeRelaySwitch.enabled) return
+        val tracker = tracker ?: return
+        val publisher = publisher ?: return
+
+        val snapshot = TelegramExtractor.extract(sbn) ?: return
+        val fresh = tracker.newMessages(sbn.key, snapshot)
+        if (fresh.isNotEmpty()) publisher.publish(fresh)
+    }
+
+    private fun trackSeenBaseline(sbn: StatusBarNotification) {
+        if (!TelegramExtractor.matches(sbn.packageName)) return
+        val snapshot = TelegramExtractor.extract(sbn) ?: return
+        tracker?.markBaseline(sbn.key, snapshot.size)
     }
 
     /** Returns (key, kind, length) or null when the value cannot be described. */
@@ -62,6 +97,4 @@ class RelayNotificationListener : NotificationListenerService() {
             else -> Triple(key, ExtraKind.OTHER, null)
         }
     }
-
-    private val sequence = AtomicLong(0)
 }

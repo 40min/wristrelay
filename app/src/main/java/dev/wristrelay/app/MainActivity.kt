@@ -27,9 +27,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -70,6 +73,7 @@ class MainActivity : ComponentActivity() {
                                 permissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }) { Text("Allow notification posting") }
                         }
+                        RelayToggle()
 
                         Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
                         Text("Sanitized notification metadata from external apps; no text content, bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), cleared when the app process dies.")
@@ -126,5 +130,23 @@ class MainActivity : ComponentActivity() {
         postingAllowed.value = getSystemService(android.app.NotificationManager::class.java)
             .areNotificationsEnabled() && (Build.VERSION.SDK_INT < 33 ||
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+    }
+}
+
+@Composable
+private fun RelayToggle() {
+    val enabled = remember { mutableStateOf(dev.wristrelay.app.settings.PrototypeRelaySwitch.enabled) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Switch(checked = enabled.value, onCheckedChange = { checked ->
+                enabled.value = checked
+                dev.wristrelay.app.settings.PrototypeRelaySwitch.enabled = checked
+            })
+            Text("Prototype relay (task 0.2)")
+        }
+        Text(
+            "Off by default. While on, each genuinely new Telegram message is published as its own independent WristRelay notification. Telegram's notifications are never touched.",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
