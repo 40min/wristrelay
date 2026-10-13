@@ -33,6 +33,7 @@ class RelayNotificationListener : NotificationListenerService() {
         tracker = MessageTracker()
         publisher = RelayNotificationPublisher(this)
         watchSettings()
+        DebugRecorder.connect(packageName)
         // Baseline current state without relaying, so a listener reconnect or
         // process restart never replays stale conversations (VALIDATION.md).
         activeNotifications?.forEach { sbn ->
@@ -121,5 +122,6 @@ class RelayNotificationListener : NotificationListenerService() {
         if (!TelegramExtractor.matches(sbn.packageName)) return
         val snapshot = TelegramExtractor.extract(sbn) ?: return
         tracker?.markBaseline(sbn.key, snapshot.size)
+        DebugRecorder.baselineAbsorbed(sbn.key, snapshot.size, TelegramExtractor.TELEGRAM_PACKAGE)
     }
 }

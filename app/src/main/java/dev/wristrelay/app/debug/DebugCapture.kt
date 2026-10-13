@@ -39,7 +39,9 @@ enum class ExtraKind(internal val label: String) {
 }
 
 object DebugEventStore {
-    const val MAX_EVENTS = 50
+    // Large enough to hold a full repro window across periodic noise from
+    // other captured apps (metadata only; process-lifetime).
+    const val MAX_EVENTS = 200
 
     private val events = ArrayDeque<DebugEvent>(MAX_EVENTS)
     private var observer: (() -> Unit)? = null
