@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
@@ -36,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -82,7 +84,6 @@ class MainActivity : ComponentActivity() {
 
                         PermissionControls(permissionRequest)
                         StatusLines()
-                        TestRelayButton()
                         GarminGuide()
 
                         if (BuildConfig.DEBUG) {
@@ -111,6 +112,21 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun DebugSection() {
+        var expanded by remember { mutableStateOf(false) }
+        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Debug ▴" else "Debug ▾") }
+        if (!expanded) return
+        Button(onClick = {
+            RelayNotificationPublisher(applicationContext).publish(
+                listOf(
+                    RelayMessage(
+                        conversationTitle = "Test conversation",
+                        isGroup = false,
+                        sender = null,
+                        text = "Test relay entry ONE",
+                    ),
+                ),
+            )
+        }) { Text("Send test relay notification") }
         Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
         Text("Sanitized notification metadata from external apps; no text content, " +
             "bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), " +
@@ -183,48 +199,21 @@ class MainActivity : ComponentActivity() {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(
-                    checked = settings.masterEnabled,
-                    onCheckedChange = { master ->
-                        val updated = settings.copy(masterEnabled = master)
+                    checked = settings.masterEnabled && settings.telegramEnabled,
+                    onCheckedChange = { on ->
+                        val updated = settings.copy(masterEnabled = on, telegramEnabled = on)
                         SettingsGate.update(updated)
                         scope.launch { store.save(updated) }
                     },
                 )
-                Text("Relay messages to the watch")
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(
-                    checked = settings.telegramEnabled,
-                    onCheckedChange = { telegram ->
-                        val updated = settings.copy(telegramEnabled = telegram)
-                        SettingsGate.update(updated)
-                        scope.launch { store.save(updated) }
-                    },
-                )
-                Text("From Telegram")
+                Text("Show Telegram messages on the watch")
             }
             Text(
-                "Both switches are off by default and are saved only on this device. " +
-                    "WristRelay never stores message contents anywhere.",
+                "Each new Telegram message appears on your watch as its own entry. " +
+                    "Off by default; saved only on this device.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-    }
-
-    @Composable
-    private fun TestRelayButton() {
-        OutlinedButton(onClick = {
-            RelayNotificationPublisher(applicationContext).publish(
-                listOf(
-                    RelayMessage(
-                        conversationTitle = "Test conversation",
-                        isGroup = false,
-                        sender = null,
-                        text = "Test relay entry ONE",
-                    ),
-                ),
-            )
-        }) { Text("Send a test notification") }
     }
 
     @Composable
