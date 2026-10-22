@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -76,8 +78,8 @@ class MainActivity : ComponentActivity() {
                         Text("WristRelay", style = MaterialTheme.typography.headlineLarge)
                         Text(
                             "Shows every new Telegram message on your watch as its own " +
-                                "separate entry. Telegram's notifications on your phone are " +
-                                "never changed."
+                                "separate entry. You can optionally hide the Telegram originals " +
+                                "after their copies are posted."
                         )
 
                         SettingsSection()
@@ -185,7 +187,7 @@ class MainActivity : ComponentActivity() {
         Text("Permission to show WristRelay notifications: " + if (postingAllowed.value) "on" else "off")
         Text(
             "Relay active: " + (if (SettingsGate.relayingAllowed()) "on" else "off") +
-                " (both switches must be on)",
+                " (Show Telegram messages must be on)",
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -199,6 +201,7 @@ class MainActivity : ComponentActivity() {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(
+                    modifier = Modifier.semantics { contentDescription = "Show Telegram messages on the watch" },
                     checked = settings.masterEnabled && settings.telegramEnabled,
                     onCheckedChange = { on ->
                         val updated = settings.copy(masterEnabled = on, telegramEnabled = on)
@@ -208,6 +211,25 @@ class MainActivity : ComponentActivity() {
                 )
                 Text("Show Telegram messages on the watch")
             }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    modifier = Modifier.semantics { contentDescription = "Hide Telegram originals" },
+                    checked = settings.hideTelegramOriginals,
+                    enabled = settings.masterEnabled && settings.telegramEnabled,
+                    onCheckedChange = { hide ->
+                        val updated = settings.copy(hideTelegramOriginals = hide)
+                        SettingsGate.update(updated)
+                        scope.launch { store.save(updated) }
+                    },
+                )
+                Text("Hide Telegram originals")
+            }
+            Text(
+                "Off by default. Dismisses each Telegram original only after its new message copies " +
+                    "are confirmed posted. Existing notifications are not swept or restored. " +
+                    "Telegram may briefly alert before dismissal.",
+                style = MaterialTheme.typography.bodySmall,
+            )
             Text(
                 "Each new Telegram message appears on your watch as its own entry. " +
                     "Off by default; saved only on this device.",
@@ -220,7 +242,7 @@ class MainActivity : ComponentActivity() {
     private fun GarminGuide() {
         Text("Connect your watch", style = MaterialTheme.typography.titleMedium)
         Text(
-            "1. Leave Telegram's phone notifications as they are.\n" +
+            "1. Allow Telegram phone notifications so WristRelay can receive them.\n" +
                 "2. In Garmin Connect, open the app notification settings (menu names " +
                 "vary by Connect version).\n" +
                 "3. Turn off forwarding for Telegram; turn it on for WristRelay.\n" +

@@ -37,6 +37,11 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
         else -> grew(conversationKey, snapshot)
     }
 
+    /** Only our confirmed source dismissal establishes a new snapshot series. */
+    fun forgetDismissedSeries(conversationKey: String) {
+        cursors.remove(conversationKey)
+    }
+
     private fun count(conversationKey: String): Int = cursors[conversationKey]?.count ?: 0
 
     private fun grew(conversationKey: String, snapshot: List<RelayMessage>): List<RelayMessage> {

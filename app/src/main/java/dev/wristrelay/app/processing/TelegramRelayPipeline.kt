@@ -31,8 +31,8 @@ class TelegramRelayPipeline(
         return when {
             fresh.isEmpty() -> RelayResult.Duplicate
             else -> {
-                publisher.publish(fresh)
-                RelayResult.Published(fresh.size)
+                if (publisher.publish(fresh)) RelayResult.Published(fresh.size)
+                else RelayResult.Failed("publication not confirmed")
             }
         }
     }

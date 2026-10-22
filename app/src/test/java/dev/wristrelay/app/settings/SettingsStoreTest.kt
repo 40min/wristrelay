@@ -2,6 +2,7 @@ package dev.wristrelay.app.settings
 
 import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
 import java.util.UUID
@@ -77,4 +78,23 @@ class SettingsStoreTest {
         }
         assertTrue(SettingsGate.relayingAllowed())
     }
+    @Test
+    fun `hide originals persists independently when relay is disabled`() = runBlocking {
+        val store = isolatedStore()
+        store.save(RelaySettings(hideTelegramOriginals = true))
+        assertEquals(RelaySettings(hideTelegramOriginals = true), store.current())
+    }
+
+    @Test
+    fun `legacy two boolean preferences default hiding off`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.IO + Job())
+        val file = File(context.filesDir, "${UUID.randomUUID()}.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit { prefs ->
+            prefs[androidx.datastore.preferences.core.booleanPreferencesKey("master_enabled")] = true
+            prefs[androidx.datastore.preferences.core.booleanPreferencesKey("telegram_enabled")] = true
+        }
+        assertEquals(RelaySettings(true, true, false), SettingsStore(dataStore, scope).current())
+    }
+
 }

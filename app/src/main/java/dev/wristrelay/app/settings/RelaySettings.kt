@@ -8,4 +8,5 @@ package dev.wristrelay.app.settings
 data class RelaySettings(
     val masterEnabled: Boolean = false,
     val telegramEnabled: Boolean = false,
+    val hideTelegramOriginals: Boolean = false,
 )

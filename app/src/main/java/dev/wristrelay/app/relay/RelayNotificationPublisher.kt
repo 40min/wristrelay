@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * implementation posts real notifications.
  */
 fun interface RelayPublisher {
-    fun publish(messages: List<RelayMessage>)
+    fun publish(messages: List<RelayMessage>): Boolean
 }
 
 /**
@@ -23,7 +23,7 @@ fun interface RelayPublisher {
  *
  * Identities are unique per publication and never reused while entries are
  * untouched; there is no per-conversation update or replacement (ADR-002) and
- * source notifications are never modified or cancelled.
+ * non-activity source actions dismiss only their originating copy after handoff.
  *
  * The channel is silent (IMPORTANCE_LOW, no sound): WristRelay entries are
  * duplicated announcements of messages the phone already alerted for, and a
@@ -33,15 +33,29 @@ fun interface RelayPublisher {
  */
 class RelayNotificationPublisher(private val context: Context) : RelayPublisher {
 
+    var lastPostedIdentities: List<Pair<String, Int>> = emptyList()
+        private set
+
     private val nextNotificationId = AtomicInteger(FIRST_NOTIFICATION_ID)
 
-    override fun publish(messages: List<RelayMessage>) {
-        if (messages.isEmpty()) return
+    override fun publish(messages: List<RelayMessage>): Boolean = publish(messages, null, null)
+
+    fun publish(
+        messages: List<RelayMessage>,
+        source: Notification?,
+        sourcePackage: String?,
+    ): Boolean {
+        lastPostedIdentities = emptyList()
         ensureChannel()
         val notificationManager = context.getSystemService(
             NotificationManager::class.java
         )
-        if (notificationManager == null || !notificationManager.areNotificationsEnabled()) return
+        val postingEnabled = notificationManager?.areNotificationsEnabled() == true
+        val channelBlocked = notificationManager?.getNotificationChannel(CHANNEL_ID)?.importance ==
+            NotificationManager.IMPORTANCE_NONE
+        if (messages.isEmpty() || !postingEnabled || channelBlocked) return false
+        checkNotNull(notificationManager)
+        val posted = mutableListOf<Pair<String, Int>>()
 
         messages.forEach { message ->
             val id = nextNotificationId.getAndIncrement()
@@ -49,12 +63,28 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title(message))
                 .setContentText(message.text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message.text))
                 .setAutoCancel(false)
                 .setOngoing(false)
                 .setWhen(System.currentTimeMillis())
-                .build()
+                .apply {
+                    source?.contentIntent?.takeIf { it.creatorPackage == sourcePackage }?.let {
+                        setContentIntent(it)
+                    }
+
+                }
+                .build().apply {
+                    actions = source?.actions?.mapIndexedNotNull { index, action ->
+                        action.takeIf { it.actionIntent?.creatorPackage == sourcePackage }?.let {
+                            RelayActionReceiver.wrap(context, it, sourcePackage, id, index)
+                        }
+                    }?.toTypedArray()
+                }
             notificationManager.notify(tagFor(id), id, notification)
+            posted.add(tagFor(id) to id)
         }
+        lastPostedIdentities = posted.toList()
+        return true
     }
 
     private fun title(message: RelayMessage): String {

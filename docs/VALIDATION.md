@@ -204,3 +204,26 @@ Sanitized evidence:
 Result: Pass / Fail / Unverified
 
 Go/No-Go and outstanding issues:
+
+## Optional original hiding and action acceptance — partial; matrix pending (2026-10-22)
+
+- Verify default preservation and saved opt-in across restart; relay off disables hiding control without erasing choice.
+- With hiding on, check copies arrive before the individual Telegram original disappears; existing originals and group summaries stay. Turning hiding off restores no originals.
+- Revoke posting/access and block the relay channel: originals must remain. Partial/failed publication must never dismiss a source.
+- On phone and Garmin, exercise supplied Reply and Mark as read and open-chat actions, before/after original dismissal; record missing/expired tokens and conversation/latest-state behavior.
+- Send rapid identical messages within one second, both after confirmed removal and before delayed removal; check every genuinely new message has an independent copy and old callbacks never replay. Test same key/post time ambiguity explicitly.
+- Reconnect baseline, duplicates, redacted/unsupported snapshots, summaries and source removal must not sweep originals or relay entries. Missed own-post confirmations may conservatively retain an original.
+
+Synthetic tests cannot establish Telegram token survival, notification ordering, or Garmin action support.
+
+## Action-copy cleanup follow-up — partial device acceptance (2026-10-22)
+
+Owner reports the latest debug APK's phone action cleanup and expanded multiline display were accepted on the owner's Android phone. Full lifecycle/stress/privacy/performance coverage and Garmin action support remain unverified; the broader matrix above stays open.
+
+Phone and Garmin retest: publish two independent copies; Mark as read on one must dismiss only that copy. Open Reply and cancel: both copies stay. Submit Reply: only its copy disappears after Android handoff. Repeat with Hide Telegram originals on and off; check reply delivery separately from UI dismissal. Expired Telegram tokens must retain copies. Activity-based actions intentionally stay direct and retain copies. Confirm whether removing a phone copy removes its mirrored watch entry. Synthetic receiver tests cover exact-copy cleanup, reply-result transport, canceled tokens, malformed routing and stale-wrapper ID reuse; they cannot prove Telegram delivery or Garmin behavior.
+
+Action cleanup recognizes submitted RemoteInput actions and semantic Mark as read. For the owner's English Telegram setup, an exact trimmed case-insensitive “Mark as read” label is also accepted when semantic metadata is absent. Unknown/localized actions without recognized semantic metadata, and no-input Reply/compose-opening actions, retain their original direct tokens and do not clean up copies. Inline wrappers require actual text or data results for one of their declared RemoteInput keys before handing off or dismissing; a missing/mismatched submission leaves the copy intact. Only result-key metadata is kept in the system-held token, never submitted text. On Android 29/30 all completion actions remain direct, so Mark as read and inline Reply do not automatically dismiss relay copies there; Android 31+ supports the per-copy cleanup wrappers. API 29/30 Robolectric regression coverage verifies the original Mark as read and inline Reply tokens remain attached to published copies.
+
+## Expanded long-text presentation — owner-reported device acceptance (2026-10-22)
+
+Owner reports the latest debug APK's expanded phone notification displayed the multiline text acceptably on the owner's Android phone. Synthetic publisher coverage verifies the full multiline body, including line breaks and emoji, in normal and expanded notification text; the owner-reported device check supplies the physical acceptance. Collapsed notifications remain Android-limited, and system UI may cap very long expanded text. 96 unit tests plus build/lint/Detekt passed; these automated checks do not establish physical-device behavior.

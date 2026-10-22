@@ -1,6 +1,6 @@
 # Development plan
 
-Status: planning; Android skeleton only. Production Telegram relay remains unimplemented. Task tracking lives on the [Dart board](https://app.dartai.com/d/wNI0RZCjzhaw-WristRelay), indexed in [TASKS.md](TASKS.md).
+Status: planning; Android skeleton only. Phone-side relay is implemented; optional original hiding/actions require device acceptance. Task tracking lives on the [Dart board](https://app.dartai.com/d/wNI0RZCjzhaw-WristRelay), indexed in [TASKS.md](TASKS.md).
 
 ## Acceptance gates
 
@@ -30,9 +30,9 @@ Maintainable single-module Kotlin/Compose application with minimal permissions, 
 Exactly one independent notification per genuinely new message, retaining legitimate repeated texts; keep that behavior reliable in daily use.
 
 - **2.1 — Implement Telegram parser with variant fixture coverage.** NotificationSource and RelayMessage based on actual Phase 0 metadata: verified variants, individual/group conversations, title/sender/body/time/identity and ordering; skip summaries; handle missing/redacted/media metadata safely. Fixture tests for chats/groups, summaries, cumulative snapshots, edits, identical consecutive messages, out-of-order timestamps and unsupported structures.
-- **2.2 — Implement detection, independent publication and ID management.** Bounded snapshot deduplication: cumulative snapshots emit exactly three; distinct identical texts remain distinct. Unique active IDs/tags, silent phone channel, small-screen presentation; no update/overwrite/group collapse, no recursive processing, no source mutation; handle multiple conversations and bursts. Unit tests for repeated callbacks, edits, ID collisions, bounded cache eviction and permission failure.
+- **2.2 — Implement detection, independent publication and ID management.** Bounded snapshot deduplication: cumulative snapshots emit exactly three; distinct identical texts remain distinct. Unique active IDs/tags, silent phone channel, small-screen presentation; no update/overwrite/group collapse, no recursive processing, no source mutation except opt-in ADR-014 dismissal; handle multiple conversations and bursts. Unit tests for repeated callbacks, edits, ID collisions, bounded cache eviction and permission failure.
 - **2.3 — Implement persistent settings and setup guide.** DataStore for settings only: master relay switch, explicit Telegram switch, access/posting status, test notification and Garmin app-filtering guide. No message history or telemetry.
-- **2.4 — Implement cleanup, reconnect handling and reliability matrix.** Validate Telegram removal/replacement/read behavior before automatic cleanup; never cancel Telegram; protect unread watch entries; bound retained state. No stale replay storm after restart; graceful access/posting revocation and regrant. Run the daily-use acceptance matrix (see [VALIDATION.md](VALIDATION.md)); document limitations and private-beta readiness.
+- **2.4 — Implement cleanup, reconnect handling and reliability matrix.** Validate Telegram removal/replacement/read behavior before automatic cleanup; preserve Telegram by default (optional scoped dismissal in ADR-014); protect unread watch entries; bound retained state. No stale replay storm after restart; graceful access/posting revocation and regrant. Run the daily-use acceptance matrix (see [VALIDATION.md](VALIDATION.md)); document limitations and private-beta readiness.
 
 ## Epic 3 — Garmin validation, audit and release
 

@@ -34,6 +34,7 @@ class SettingsStore(
         RelaySettings(
             masterEnabled = prefs[MASTER] ?: false,
             telegramEnabled = prefs[TELEGRAM] ?: false,
+            hideTelegramOriginals = prefs[HIDE_ORIGINALS] ?: false,
         )
     }
 
@@ -43,6 +44,7 @@ class SettingsStore(
         dataStore.edit { prefs ->
             prefs[MASTER] = settings.masterEnabled
             prefs[TELEGRAM] = settings.telegramEnabled
+            prefs[HIDE_ORIGINALS] = settings.hideTelegramOriginals
         }
     }
 
@@ -57,6 +59,7 @@ class SettingsStore(
     }
 
     private companion object {
+        val HIDE_ORIGINALS = booleanPreferencesKey("hide_telegram_originals")
         val MASTER = booleanPreferencesKey("master_enabled")
         val TELEGRAM = booleanPreferencesKey("telegram_enabled")
     }

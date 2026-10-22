@@ -3,7 +3,7 @@
 Read README.md and docs/PLAN.md, docs/DECISIONS.md and docs/PRIVACY.md before implementing behavior.
 
 - One genuinely new message creates one independent notification; never overwrite previous message entries or deduplicate by text alone.
-- Never cancel, modify or suppress original Telegram notifications. Garmin Connect app filtering is owner setup.
+- Preserve Telegram originals by default. Only the explicit off-by-default Hide Telegram originals setting permits dismissing a specific supported message source after all fresh copies are confirmed active; never sweep originals or remove relay copies except the exact copy after its explicit user action is successfully handed off. Source removal never cleans relay copies. Garmin Connect app filtering is owner setup.
 - No INTERNET, analytics, persistent message history, message-body logs, polling or permanent foreground service.
 - Filter explicitly enabled sources early; ignore WristRelay itself. Keep caches bounded.
 - Phase 0 physical Garmin acceptance gates production relay expansion. Cleanup policy needs source-removal evidence.

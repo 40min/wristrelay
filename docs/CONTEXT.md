@@ -8,7 +8,7 @@ The initial environment is an Android phone, Telegram, Garmin Connect and a Garm
 
 One genuinely new message produces one independent notification. Three messages must remain browsable as three entries. Do not replace an existing message notification when a later message arrives. Do not deduplicate by text alone.
 
-Telegram notifications on the phone remain untouched. The owner configures Garmin Connect to forward WristRelay and exclude Telegram. Other apps retain their existing forwarding settings.
+Telegram notifications on the phone remain untouched by default. The off-by-default Hide Telegram originals setting permits dismissing only a supported individual message source after every fresh relay copy is confirmed active (ADR-014); it never sweeps existing originals or removes relay entries. The owner configures Garmin Connect to forward WristRelay and exclude Telegram. Other apps retain their existing forwarding settings.
 
 ## Scope
 

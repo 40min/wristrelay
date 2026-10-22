@@ -17,8 +17,9 @@ class TelegramRelayPipelineTest {
 
     private class RecordingPublisher : RelayPublisher {
         val published = mutableListOf<RelayMessage>()
-        override fun publish(messages: List<RelayMessage>) {
+        override fun publish(messages: List<RelayMessage>): Boolean {
             published.addAll(messages)
+            return true
         }
     }
 
@@ -126,4 +127,22 @@ class TelegramRelayPipelineTest {
 
         assertEquals(listOf("one", "two"), publisher.published.map { it.text })
     }
+    @Test
+    fun `unconfirmed publication never reports published`() {
+        val pipeline = TelegramRelayPipeline(MessageTracker(), RelayPublisher { false })
+        assertTrue(pipeline.run("chat", listOf(message("one"))) is RelayResult.Failed)
+    }
+
+    @Test
+    fun `confirmed dismissal permits identical timestamp and content in new series`() {
+        val tracker = MessageTracker()
+        val publisher = RecordingPublisher()
+        val pipeline = TelegramRelayPipeline(tracker, publisher)
+        val snapshot = listOf(message("OK").copy(timestampMs = 1000))
+        pipeline.run("chat", snapshot)
+        tracker.forgetDismissedSeries("chat")
+        assertEquals(RelayResult.Published(1), pipeline.run("chat", snapshot))
+        assertEquals(2, publisher.published.size)
+    }
+
 }

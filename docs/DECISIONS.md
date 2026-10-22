@@ -25,3 +25,21 @@ The earlier discussion considered updating one notification per conversation and
 ## Future changes
 
 Append a dated decision with evidence, alternatives, consequences and the superseded ID. Do not silently rewrite the product contract when a device limitation appears; record the limitation and reassess feasibility.
+
+## ADR-014 — Optional original dismissal and supplied actions (2026-10-22)
+
+Owner authorization supersedes only ADR-003's absolute prohibition on dismissing originals. Preservation remains the default; an independent persisted `hideTelegramOriginals=false` option permits dismissing only a supported Telegram message snapshot after all its fresh copies are confirmed active. There is no sweep, restoration, summary dismissal or relay cleanup. Garmin filtering remains owner setup. The rejected alternative was always hiding originals, which would change existing behavior without opt-in.
+
+Copies reuse source-owned valid action PendingIntents/RemoteInputs and content intent; creator package must match Telegram. No delete intent or custom send handler is forwarded. Action lifetime and conversation/latest-message semantics remain Telegram's responsibility. Dismissal can invalidate tokens and cannot prevent an initial Telegram alert.
+
+Confirmation is event-driven using own notification callbacks plus active-entry checks, bounded content-free key/post-time/notification-ID metadata. Own cancellation starts a fresh series after its removal callback, or a distinct post-time repost before removal; delayed old removal cannot reset that newer series. Same-key/same-post-time indistinguishable callbacks before removal cannot reliably identify a new message without a stable source message ID. Physical action, rapid-arrival and lifecycle acceptance remains open.
+
+## ADR-015 — Dismiss the explicitly acted-on copy after handoff (2026-10-22)
+
+Owner device evidence: supplied Reply sends and Mark as read executes, but the copied notification remains. The owner requests removal of that copy after Mark as read or submitting Reply, independently of Hide Telegram originals. This adds a narrow explicit-user-action exception to ADR-012; automatic source-removal cleanup remains disabled. Opening/canceling reply composition does not count.
+
+Wrap non-activity actions in a nonexported receiver, retain Telegram ownership/RemoteInput metadata, and remove only the originating still-matching active copy after Android accepts the original token handoff. Expired/rejected tokens leave the copy. No conversation sweep, other-copy deletion, or original Telegram cancellation occurs. Random per-action identity guards against numeric notification-ID reuse. Activity tokens stay direct to avoid activity trampolines, so their reply/send completion cannot be observed and their copies remain. Rejected alternatives: auto-cancel (content-click semantics only), cleanup on source removal (not read evidence), and conversation-wide cancellation (would discard independent unread entries).
+
+Successful Android handoff is not Telegram server delivery confirmation. Phone-copy removal may remove its mirrored watch copy. Updated device acceptance remains open; the owner evidence above predates this fix.
+
+Action cleanup recognizes submitted RemoteInput actions and semantic Mark as read. For the owner's English Telegram setup, an exact trimmed case-insensitive “Mark as read” label is also accepted when semantic metadata is absent. Unknown/localized actions without recognized semantic metadata, and no-input Reply/compose-opening actions, retain their original direct tokens and do not clean up copies. Inline wrappers require actual text or data results for one of their declared RemoteInput keys before handing off or dismissing; a missing/mismatched submission leaves the copy intact. Only result-key metadata is kept in the system-held token, never submitted text.

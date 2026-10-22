@@ -58,6 +58,18 @@ class RelayNotificationPublisherTest {
     }
 
     @Test
+    fun `expanded notification retains the full multiline message`() {
+        val text = "First line 🌿\nSecond line with more detail\nThird line 🙂"
+        publisher.publish(listOf(message(text), message("separate copy")))
+
+        val posted = posted().associateBy { it.notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString() }
+        val longMessage = posted.getValue(text).notification.extras
+        assertEquals(text, longMessage.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT).toString())
+        assertEquals(text, longMessage.getCharSequence(android.app.Notification.EXTRA_TEXT).toString())
+        assertEquals(2, posted.size)
+    }
+
+    @Test
     fun `identities are unique across repeated identical publications`() {
         val batch = listOf(message(text = "one"))
         publisher.publish(batch)
@@ -163,4 +175,35 @@ class RelayNotificationPublisherTest {
         val ids: Set<Int> = posted.map { status -> status.id }.toSet()
         assertEquals(10, ids.size)
     }
+    @Test
+    fun `copies wrap supplied action token and retain remote input without delete intent`() {
+        val intent = android.app.PendingIntent.getBroadcast(
+            context, 42, android.content.Intent("fixture.reply").setPackage(context.packageName),
+            android.app.PendingIntent.FLAG_MUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val remote = android.app.RemoteInput.Builder("reply").setLabel("Reply").build()
+        val action = android.app.Notification.Action.Builder(null, "Reply", intent)
+            .addRemoteInput(remote).build()
+        val source = android.app.Notification.Builder(context, "source")
+            .setSmallIcon(dev.wristrelay.app.R.drawable.ic_notification)
+            .setContentIntent(intent).setDeleteIntent(intent).addAction(action).build()
+        assertTrue(publisher.publish(listOf(message("one"), message("two")), source, context.packageName))
+        posted().forEach {
+            assertNotEquals(intent, it.notification.actions.single().actionIntent)
+            assertEquals("reply", it.notification.actions.single().remoteInputs.single().resultKey)
+            assertEquals(intent, it.notification.contentIntent)
+            assertEquals(null, it.notification.deleteIntent)
+        }
+        assertEquals(2, posted().map { it.id }.toSet().size)
+    }
+
+    @Test
+    fun `blocked channel is not confirmed published`() {
+        notificationManager.createNotificationChannel(android.app.NotificationChannel(
+            "wristrelay.relayed_messages_silent", "blocked", NotificationManager.IMPORTANCE_NONE,
+        ))
+        assertTrue(!publisher.publish(listOf(message())))
+        assertTrue(posted().isEmpty())
+    }
+
 }
