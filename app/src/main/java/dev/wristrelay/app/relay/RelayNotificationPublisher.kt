@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.R
 import dev.wristrelay.app.model.RelayMessage
 import java.util.concurrent.atomic.AtomicInteger
@@ -44,6 +45,7 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
         messages: List<RelayMessage>,
         source: Notification?,
         sourcePackage: String?,
+        settings: RelaySettings = RelaySettings(),
     ): Boolean {
         lastPostedIdentities = emptyList()
         ensureChannel()
@@ -64,6 +66,7 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
                 .setContentTitle(title(message))
                 .setContentText(message.text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(message.text))
+                .setTimeoutAfter(settings.timeoutMillis)
                 .setAutoCancel(false)
                 .setOngoing(false)
                 .setWhen(System.currentTimeMillis())

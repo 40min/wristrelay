@@ -187,10 +187,15 @@ class RelayNotificationPublisherTest {
         val source = android.app.Notification.Builder(context, "source")
             .setSmallIcon(dev.wristrelay.app.R.drawable.ic_notification)
             .setContentIntent(intent).setDeleteIntent(intent).addAction(action).build()
-        assertTrue(publisher.publish(listOf(message("one"), message("two")), source, context.packageName))
+        assertTrue(publisher.publish(
+            listOf(message("one"), message("two")), source, context.packageName,
+            dev.wristrelay.app.settings.RelaySettings(autoClearEnabled = true),
+        ))
+        assertEquals(0L, source.timeoutAfter)
         posted().forEach {
             assertNotEquals(intent, it.notification.actions.single().actionIntent)
             assertEquals("reply", it.notification.actions.single().remoteInputs.single().resultKey)
+            assertEquals(3_600_000L, it.notification.timeoutAfter)
             assertEquals(intent, it.notification.contentIntent)
             assertEquals(null, it.notification.deleteIntent)
         }
@@ -204,6 +209,22 @@ class RelayNotificationPublisherTest {
         ))
         assertTrue(!publisher.publish(listOf(message())))
         assertTrue(posted().isEmpty())
+    }
+
+    @Test
+    fun `expiry config affects only future independent copies`() {
+        publisher.publish(listOf(message("default")))
+        val minutes = dev.wristrelay.app.settings.RelaySettings(autoClearEnabled = true, autoClearMinutes = 5)
+        publisher.publish(listOf(message("minutes")), null, null, minutes)
+        publisher.publish(listOf(message("hours")), null, null, minutes.copy(autoClearMinutes = 120))
+        publisher.publish(listOf(message("disabled")), null, null, minutes.copy(autoClearEnabled = false))
+        val timeouts = posted().associate {
+            it.notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString() to
+                it.notification.timeoutAfter
+        }
+        assertEquals(mapOf("default" to 0L, "minutes" to 300_000L, "hours" to 7_200_000L, "disabled" to 0L), timeouts)
+        assertEquals(4, posted().map { it.id }.toSet().size)
+        assertEquals(4, posted().map { it.tag }.toSet().size)
     }
 
 }

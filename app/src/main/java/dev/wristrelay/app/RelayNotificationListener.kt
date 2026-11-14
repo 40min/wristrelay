@@ -99,7 +99,7 @@ class RelayNotificationListener : NotificationListenerService() {
         if (pendingDismissals[sbn.key]?.postTime != sbn.postTime) pendingDismissals.remove(sbn.key)
         val snapshot = TelegramExtractor.extract(sbn)
         val pipeline = TelegramRelayPipeline(currentTracker, RelayPublisher { messages ->
-            currentPublisher.publish(messages, sbn.notification, sbn.packageName)
+            currentPublisher.publish(messages, sbn.notification, sbn.packageName, SettingsGate.current)
         })
         // 3.2 uses the same trace to accumulate processing-time evidence
         // from live use; the figure covers detection and publication.

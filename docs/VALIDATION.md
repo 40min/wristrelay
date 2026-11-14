@@ -227,3 +227,14 @@ Action cleanup recognizes submitted RemoteInput actions and semantic Mark as rea
 ## Expanded long-text presentation — owner-reported device acceptance (2026-10-22)
 
 Owner reports the latest debug APK's expanded phone notification displayed the multiline text acceptably on the owner's Android phone. Synthetic publisher coverage verifies the full multiline body, including line breaks and emoji, in normal and expanded notification text; the owner-reported device check supplies the physical acceptance. Collapsed notifications remain Android-limited, and system UI may cap very long expanded text. 96 unit tests plus build/lint/Detekt passed; these automated checks do not establish physical-device behavior.
+
+## Optional auto-clear acceptance (2026-10-29; owner device checks pending)
+
+Robolectric checks cover default-off timeout, minute/hour conversion and bounds, settings persistence, independent notification identities, and future-publication-only changes. These checks inspect the timeout passed to Android; they do not prove wall-clock expiry or Garmin propagation.
+
+- With auto-clear off, post ONE/TWO/THREE; verify independent phone/watch entries remain as before.
+- With relay on, enable auto-clear, open the duration dialog, apply 1 minute and post copies at staggered times; verify each expires separately on the phone and record whether/how soon its watch mirror disappears. Check an unread entry explicitly.
+- Set 2 hours and verify saved duration after reopening; use the debug test copy to check the same timeout path.
+- Change duration and disable auto-clear after posting: old copies keep their assigned timers; future disabled copies do not expire. Telegram originals stay unchanged by expiry.
+- Confirm Reply/Mark as read still removes only the acted-on copy after successful handoff; source removal still leaves relay copies alone.
+- Check the settings and duration dialog in light and dark themes, with large text and on a narrow screen. Cancel or dismiss the dialog after editing and verify the saved duration stays the same. Switch units and verify an exact conversion or an empty field. Turn relay off and verify the duration button is disabled. Verify the permission statuses, Garmin guide and debug controls under Advanced. Empty, zero, negative, fractional, overflowing and out-of-range input must show validation and must not save.

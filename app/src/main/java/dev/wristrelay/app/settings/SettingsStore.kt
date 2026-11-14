@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,9 @@ class SettingsStore(
             masterEnabled = prefs[MASTER] ?: false,
             telegramEnabled = prefs[TELEGRAM] ?: false,
             hideTelegramOriginals = prefs[HIDE_ORIGINALS] ?: false,
+            autoClearEnabled = prefs[AUTO_CLEAR] ?: false,
+            autoClearMinutes = prefs[AUTO_CLEAR_MINUTES]
+                ?.takeIf { it in 1..RelaySettings.MAX_AUTO_CLEAR_MINUTES } ?: 60,
         )
     }
 
@@ -45,6 +49,8 @@ class SettingsStore(
             prefs[MASTER] = settings.masterEnabled
             prefs[TELEGRAM] = settings.telegramEnabled
             prefs[HIDE_ORIGINALS] = settings.hideTelegramOriginals
+            prefs[AUTO_CLEAR] = settings.autoClearEnabled
+            prefs[AUTO_CLEAR_MINUTES] = settings.autoClearMinutes
         }
     }
 
@@ -59,6 +65,8 @@ class SettingsStore(
     }
 
     private companion object {
+        val AUTO_CLEAR = booleanPreferencesKey("auto_clear_enabled")
+        val AUTO_CLEAR_MINUTES = intPreferencesKey("auto_clear_minutes")
         val HIDE_ORIGINALS = booleanPreferencesKey("hide_telegram_originals")
         val MASTER = booleanPreferencesKey("master_enabled")
         val TELEGRAM = booleanPreferencesKey("telegram_enabled")

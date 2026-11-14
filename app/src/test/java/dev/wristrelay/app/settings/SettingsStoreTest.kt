@@ -97,4 +97,52 @@ class SettingsStoreTest {
         assertEquals(RelaySettings(true, true, false), SettingsStore(dataStore, scope).current())
     }
 
+    @Test
+    fun `expiry persists independently with configured minutes`() = runBlocking {
+        val store = isolatedStore()
+        val settings = RelaySettings(autoClearEnabled = true, autoClearMinutes = 15)
+        store.save(settings)
+        assertEquals(settings, store.current())
+        store.save(settings.copy(autoClearEnabled = false))
+        assertEquals(15, store.current().autoClearMinutes)
+        assertEquals(0L, store.current().timeoutMillis)
+    }
+
+    @Test
+    fun `duration validates units bounds and overflow`() {
+        assertEquals(false, RelaySettings().autoClearEnabled)
+        assertEquals(60, RelaySettings().autoClearMinutes)
+        assertEquals(15, RelaySettings.durationMinutes("15", false))
+        assertEquals(120, RelaySettings.durationMinutes("2", true))
+        assertEquals(10080, RelaySettings.durationMinutes("168", true))
+        assertEquals(10080, RelaySettings.durationMinutes("10080", false))
+        listOf("", "0", "-1", "1.5", "abc", "2147483648").forEach {
+            assertEquals(null, RelaySettings.durationMinutes(it, false))
+            assertEquals(null, RelaySettings.durationMinutes(it, true))
+        }
+        assertEquals(null, RelaySettings.durationMinutes("169", true))
+        assertEquals(null, RelaySettings.durationMinutes("10081", false))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `nonpositive persisted duration cannot be constructed`() {
+        RelaySettings(autoClearMinutes = 0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `oversized persisted duration cannot be constructed`() {
+        RelaySettings(autoClearMinutes = 10081)
+    }
+
+    @Test
+    fun `corrupt duration falls back to safe one hour`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.IO + Job())
+        val file = File(context.filesDir, "${UUID.randomUUID()}.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit { prefs ->
+            prefs[androidx.datastore.preferences.core.intPreferencesKey("auto_clear_minutes")] = -1
+        }
+        assertEquals(RelaySettings(), SettingsStore(dataStore, scope).current())
+    }
+
 }
