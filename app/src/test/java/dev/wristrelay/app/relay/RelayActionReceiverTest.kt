@@ -50,7 +50,7 @@ class RelayActionReceiverTest {
         assertTrue(RelayNotificationPublisher(context).publish(
             listOf(RelayMessage(null, false, null, "one"), RelayMessage(null, false, null, "two")),
             source, telegram.packageName,
-        ))
+        ).fullySubmitted)
         return target
     }
 
@@ -74,7 +74,7 @@ class RelayActionReceiverTest {
         assertTrue(RelayNotificationPublisher(context).publish(
             listOf(RelayMessage(null, false, null, "one"), RelayMessage(null, false, null, "two")),
             source, telegram.packageName,
-        ))
+        ).fullySubmitted)
         val originalTokens = listOf(markRead.actionIntent, reply.actionIntent)
         assertTrue(manager.activeNotifications.all { entry ->
             entry.notification.actions.map { it.actionIntent } == originalTokens

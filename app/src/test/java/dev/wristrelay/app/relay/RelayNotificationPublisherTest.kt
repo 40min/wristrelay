@@ -51,6 +51,23 @@ class RelayNotificationPublisherTest {
     )
 
     @Test
+    fun `second notify failure reports only the first submitted identity`() {
+        var attempts = 0
+        val failingPublisher = RelayNotificationPublisher(context) { manager, tag, id, notification ->
+            if (++attempts == 2) throw SecurityException("fixture refusal")
+            manager.notify(tag, id, notification)
+        }
+
+        val result = failingPublisher.publish(listOf(message("first"), message("second"), message("third")))
+
+        assertEquals(2, attempts)
+        assertEquals(1, result.submittedCount)
+        assertTrue(!result.fullySubmitted)
+        val entry = posted().single()
+        assertEquals(listOf(entry.tag to entry.id), result.submittedIdentities)
+    }
+
+    @Test
     fun `each message becomes one independent notification`() {
         publisher.publish(listOf(message(text = "one"), message(text = "two", sender = null)))
         val posted = posted()
@@ -232,7 +249,7 @@ class RelayNotificationPublisherTest {
         assertTrue(publisher.publish(
             listOf(message("one"), message("two")), source, context.packageName,
             dev.wristrelay.app.settings.RelaySettings(autoClearEnabled = true),
-        ))
+        ).fullySubmitted)
         assertEquals(0L, source.timeoutAfter)
         posted().forEach {
             assertNotEquals(intent, it.notification.actions.single().actionIntent)
@@ -249,7 +266,7 @@ class RelayNotificationPublisherTest {
         notificationManager.createNotificationChannel(android.app.NotificationChannel(
             "wristrelay.relayed_messages_silent", "blocked", NotificationManager.IMPORTANCE_NONE,
         ))
-        assertTrue(!publisher.publish(listOf(message())))
+        assertTrue(!publisher.publish(listOf(message())).fullySubmitted)
         assertTrue(posted().isEmpty())
     }
 

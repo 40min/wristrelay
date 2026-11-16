@@ -17,7 +17,32 @@ import java.util.concurrent.atomic.AtomicInteger
  * implementation posts real notifications.
  */
 fun interface RelayPublisher {
-    fun publish(messages: List<RelayMessage>): Boolean
+    fun publish(messages: List<RelayMessage>): RelayPublication
+}
+
+/**
+ * Result of one publication attempt: the identities Android accepted,
+ * in requested order, stopping at the first submission failure.
+ * Copies after that failure are never attempted in the same call, so
+ * [submittedIdentities] is exactly the successfully submitted prefix
+ * (publication-loss guard, Cf7Lga4n2Sx7): the tracker advances only
+ * through it, and unsubmitted copies retry on the next qualifying event.
+ */
+data class RelayPublication(
+    val submittedIdentities: List<Pair<String, Int>>,
+    val requestedCount: Int,
+    val failureReason: String? = null,
+) {
+    val submittedCount: Int get() = submittedIdentities.size
+
+    /** True when notify() accepted every requested copy. */
+    val fullySubmitted: Boolean get() = submittedCount == requestedCount
+
+    companion object {
+        /** Nothing was submitted: posting disabled or channel blocked. */
+        fun refused(requestedCount: Int, reason: String): RelayPublication =
+            RelayPublication(emptyList(), requestedCount, reason)
+    }
 }
 
 /**
@@ -33,26 +58,33 @@ fun interface RelayPublisher {
  * or replacement (ADR-002) and non-activity source actions dismiss only
  * their originating copy after handoff.
  *
+ * Submission stops at the first copy Android refuses (Cf7Lga4n2Sx7):
+ * the returned [RelayPublication] reports the successfully submitted
+ * prefix, so detection never advances past copies Android did not accept;
+ * the missing copies retry on the next qualifying event for the
+ * conversation. Telegram originals wait for a fully confirmed batch.
+ *
  * The channel is silent (IMPORTANCE_LOW, no sound): WristRelay entries are
  * duplicated announcements of messages the phone already alerted for, and a
  * second alert on the phone would be noise (task 2.2). Watch mirroring of
  * silent notifications is a remaining device-validation item (2.2/3.1 in
  * VALIDATION.md); vibration on the watch is not affected by channel sound.
  */
-class RelayNotificationPublisher(private val context: Context) : RelayPublisher {
+class RelayNotificationPublisher internal constructor(
+    private val context: Context,
+    private val submit: (NotificationManager, String, Int, Notification) -> Unit,
+) : RelayPublisher {
+    constructor(context: Context) : this(context, NotificationManager::notify)
 
-    var lastPostedIdentities: List<Pair<String, Int>> = emptyList()
-        private set
-
-    override fun publish(messages: List<RelayMessage>): Boolean = publish(messages, null, null)
+    override fun publish(messages: List<RelayMessage>): RelayPublication = publish(messages, null, null)
 
     fun publish(
         messages: List<RelayMessage>,
         source: Notification?,
         sourcePackage: String?,
         settings: RelaySettings = RelaySettings(),
-    ): Boolean {
-        lastPostedIdentities = emptyList()
+    ): RelayPublication {
+        if (messages.isEmpty()) return RelayPublication(emptyList(), 0)
         ensureChannel()
         val notificationManager = context.getSystemService(
             NotificationManager::class.java
@@ -60,40 +92,53 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
         val postingEnabled = notificationManager?.areNotificationsEnabled() == true
         val channelBlocked = notificationManager?.getNotificationChannel(CHANNEL_ID)?.importance ==
             NotificationManager.IMPORTANCE_NONE
-        if (messages.isEmpty() || !postingEnabled || channelBlocked) return false
+        if (!postingEnabled || channelBlocked) {
+            return RelayPublication.refused(messages.size, "publication not confirmed")
+        }
         checkNotNull(notificationManager)
         skipActiveIdentities(notificationManager)
-        val posted = mutableListOf<Pair<String, Int>>()
+        val submitted = mutableListOf<Pair<String, Int>>()
+        var failureReason: String? = null
 
-        messages.forEach { message ->
-            val id = nextNotificationId.getAndIncrement()
-            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(title(message))
-                .setContentText(message.text)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(message.text))
-                .setTimeoutAfter(settings.timeoutMillis)
-                .setAutoCancel(false)
-                .setOngoing(false)
-                .setWhen(System.currentTimeMillis())
-                .apply {
-                    source?.contentIntent?.takeIf { it.creatorPackage == sourcePackage }?.let {
-                        setContentIntent(it)
-                    }
-
-                }
-                .build().apply {
-                    actions = source?.actions?.mapIndexedNotNull { index, action ->
-                        action.takeIf { it.actionIntent?.creatorPackage == sourcePackage }?.let {
-                            RelayActionReceiver.wrap(context, it, sourcePackage, id, index)
+        for (message in messages) {
+            // Stop at the first refusal: already accepted copies are the
+            // submitted prefix; later copies were never attempted and retry
+            // with the next qualifying event (Cf7Lga4n2Sx7).
+            try {
+                val id = nextNotificationId.getAndIncrement()
+                val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentTitle(title(message))
+                    .setContentText(message.text)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(message.text))
+                    .setTimeoutAfter(settings.timeoutMillis)
+                    .setAutoCancel(false)
+                    .setOngoing(false)
+                    .setWhen(System.currentTimeMillis())
+                    .apply {
+                        source?.contentIntent?.takeIf { it.creatorPackage == sourcePackage }?.let {
+                            setContentIntent(it)
                         }
-                    }?.toTypedArray()
-                }
-            notificationManager.notify(tagFor(id), id, notification)
-            posted.add(tagFor(id) to id)
+
+                    }
+                    .build().apply {
+                        actions = source?.actions?.mapIndexedNotNull { index, action ->
+                            action.takeIf { it.actionIntent?.creatorPackage == sourcePackage }?.let {
+                                RelayActionReceiver.wrap(context, it, sourcePackage, id, index)
+                            }
+                        }?.toTypedArray()
+                    }
+                submit(notificationManager, tagFor(id), id, notification)
+                submitted.add(tagFor(id) to id)
+            } catch (failure: SecurityException) {
+                failureReason = "publish denied: ${failure.javaClass.simpleName}"
+                break
+            } catch (failure: IllegalArgumentException) {
+                failureReason = "publish rejected: ${failure.javaClass.simpleName}"
+                break
+            }
         }
-        lastPostedIdentities = posted.toList()
-        return true
+        return RelayPublication(submitted.toList(), messages.size, failureReason)
     }
 
     /**
