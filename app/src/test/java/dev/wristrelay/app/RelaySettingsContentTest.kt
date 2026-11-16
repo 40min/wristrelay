@@ -9,6 +9,7 @@ import dev.wristrelay.app.settings.FaultingSettingsDataStore
 import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.settings.SettingsGate
 import dev.wristrelay.app.settings.SettingsStore
+import dev.wristrelay.app.ui.RelaySettingsContent
 import dev.wristrelay.app.ui.WristRelayTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
