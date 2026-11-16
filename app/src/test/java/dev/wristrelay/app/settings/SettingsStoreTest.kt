@@ -7,9 +7,13 @@ import androidx.test.core.app.ApplicationProvider
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -35,10 +39,11 @@ class SettingsStoreTest {
         SettingsGate.update(RelaySettings())
     }
 
-    private fun isolatedStore(): SettingsStore {
+    private fun isolatedStore(
+        scope: CoroutineScope = CoroutineScope(Dispatchers.IO + Job()),
+    ): SettingsStore {
         context.filesDir.mkdirs()
         val file = File(context.filesDir, "${UUID.randomUUID()}.preferences_pb")
-        val scope = CoroutineScope(Dispatchers.IO + Job())
         val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
         return SettingsStore(dataStore, scope)
     }
@@ -76,16 +81,23 @@ class SettingsStoreTest {
 
     @Test
     fun `observer keeps the synchronous gate aligned`() = runBlocking {
-        val store = isolatedStore()
-        store.observe { SettingsGate.update(it) }
-        store.save(RelaySettings(masterEnabled = true, telegramEnabled = true))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val store = isolatedStore(scope)
+            val expectedSettingsObserved = CompletableDeferred<Unit>()
+            store.observe {
+                SettingsGate.update(it)
+                if (it.masterEnabled && it.telegramEnabled) expectedSettingsObserved.complete(Unit)
+            }
+            store.save(RelaySettings(masterEnabled = true, telegramEnabled = true))
 
-        val deadline = System.currentTimeMillis() + 2_000
-        while (!SettingsGate.relayingAllowed() && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10)
+            withTimeout(2_000) { expectedSettingsObserved.await() }
+            assertTrue(SettingsGate.relayingAllowed())
+        } finally {
+            scope.cancel()
         }
-        assertTrue(SettingsGate.relayingAllowed())
     }
+
     @Test
     fun `hide originals persists independently when relay is disabled`() = runBlocking {
         val store = isolatedStore()
