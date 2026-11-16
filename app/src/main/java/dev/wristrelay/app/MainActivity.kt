@@ -45,6 +45,7 @@ import androidx.core.app.NotificationManagerCompat
 import dev.wristrelay.app.debug.DebugEvent
 import dev.wristrelay.app.debug.DebugEventStore
 import dev.wristrelay.app.debug.DebugFormat
+import dev.wristrelay.app.debug.SpotifyProbe
 import dev.wristrelay.app.model.RelayMessage
 import dev.wristrelay.app.relay.RelayNotificationPublisher
 import dev.wristrelay.app.settings.SettingsGate
@@ -121,6 +122,7 @@ class MainActivity : ComponentActivity() {
                 SettingsGate.current,
             )
         }) { Text("Send test relay notification") }
+        SpotifyProbeSection()
         Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
         Text("Sanitized notification metadata from external apps; no text content, " +
             "bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), " +
@@ -157,6 +159,40 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.horizontalScroll(rememberScrollState())
                     )
                 }
+            }
+        }
+    }
+
+    @Composable
+    private fun SpotifyProbeSection() {
+        val enabled by SpotifyProbe.enabled.collectAsState()
+        val events by SpotifyProbe.events.collectAsState()
+        OutlinedButton(onClick = { SpotifyProbe.setEnabled(!enabled) }) {
+            Text(if (enabled) "Stop Spotify probe" else "Start Spotify probe")
+        }
+        if (enabled) {
+            Text(
+                "Play Spotify until a track changes to an ad and back.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(
+                enabled = events.isNotEmpty(),
+                onClick = {
+                    val report = SpotifyProbe.events.value.joinToString("\n")
+                    val clipboard = getSystemService(ClipboardManager::class.java)
+                    clipboard.setPrimaryClip(ClipData.newPlainText("wristrelay-spotify", report))
+                },
+            ) { Text("Copy Spotify log") }
+            if (events.isEmpty()) {
+                Text("Waiting for notification listener…")
+            } else {
+                Text(
+                    "Latest ${minOf(events.size, SpotifyProbe.TAIL_EVENTS)} of ${events.size} retained events",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            events.takeLast(SpotifyProbe.TAIL_EVENTS).forEach { event ->
+                Text(event, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

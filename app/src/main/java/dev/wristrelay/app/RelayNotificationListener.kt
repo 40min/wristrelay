@@ -1,30 +1,38 @@
 package dev.wristrelay.app
 
 import android.app.Notification
+import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import dev.wristrelay.app.processing.SourceDismissalTracker
 import dev.wristrelay.app.relay.RelayPublisher
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import dev.wristrelay.app.debug.DebugRecorder
+import dev.wristrelay.app.debug.SpotifyProbe
+import dev.wristrelay.app.debug.SpotifyProbeCoordinator
 import dev.wristrelay.app.processing.MessageTracker
 import dev.wristrelay.app.processing.RelayActivationWatcher
 import dev.wristrelay.app.processing.RelayResult
 import dev.wristrelay.app.processing.TelegramRelayPipeline
 import dev.wristrelay.app.relay.RelayNotificationPublisher
+import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.settings.SettingsGate
 import dev.wristrelay.app.settings.SettingsStore
+import dev.wristrelay.app.source.spotify.SPOTIFY_PACKAGE
+import dev.wristrelay.app.source.spotify.SpotifyAdMute
 import dev.wristrelay.app.source.telegram.TelegramExtractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Relay listener: extracts MessagingStyle messages from Telegram snapshots
  * and publishes one independent notification per genuinely new message.
  * Filtering happens first; WristRelay's own notifications and unrelated
- * packages never proceed beyond this gate (the debug capture side is the
- * only other consumer, and it never touches message contents).
+ * packages never enter the Telegram relay pipeline. Debug probes run separately.
  */
 class RelayNotificationListener : NotificationListenerService() {
 
@@ -36,6 +44,10 @@ class RelayNotificationListener : NotificationListenerService() {
     private var publisher: RelayNotificationPublisher? = null
     private var settingsScope: CoroutineScope? = null
 
+    private var spotifyMuteSettings = RelaySettings()
+    private var spotifyAdMute: SpotifyAdMute? = null
+    private val spotifyProbe by lazy { SpotifyProbeCoordinator(this) { activeNotifications } }
+
     override fun onListenerConnected() {
         pendingDismissals.clear()
         dismissals.clear()
@@ -44,18 +56,25 @@ class RelayNotificationListener : NotificationListenerService() {
         publisher = RelayNotificationPublisher(this)
         // Load settings into the synchronous gate; activation re-baselines existing conversations.
         settingsScope?.cancel()
+        spotifyMuteSettings = RelaySettings()
+        spotifyAdMute?.stop()
         val activationWatcher = RelayActivationWatcher {
             activeNotifications?.forEach { sbn ->
                 trackSeenBaseline(sbn)
             }
         }
         settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope ->
-            SettingsStore(applicationContext).observe { settings ->
-                SettingsGate.update(settings)
-                activationWatcher.update(settings)
+            scope.launch {
+                SettingsStore(applicationContext).flow.collect { settings ->
+                    SettingsGate.update(settings)
+                    activationWatcher.update(settings)
+                    spotifyMuteSettings = settings
+                    if (!settings.spotifyAdMuteEnabled) spotifyAdMute?.stop()
+                }
             }
         }
         DebugRecorder.connect(packageName)
+        if (BuildConfig.DEBUG) spotifyProbe.start(checkNotNull(settingsScope))
         // Baseline current state without relaying, so a listener reconnect or
         // process restart never replays stale conversations (VALIDATION.md).
         activeNotifications?.forEach { sbn ->
@@ -63,7 +82,20 @@ class RelayNotificationListener : NotificationListenerService() {
         }
     }
 
+    override fun onListenerDisconnected() {
+        settingsScope?.cancel()
+        spotifyMuteSettings = RelaySettings()
+        spotifyAdMute?.stop()
+        if (BuildConfig.DEBUG) {
+            spotifyProbe.stop()
+            SpotifyProbe.record("Notification listener disconnected")
+        }
+        super.onListenerDisconnected()
+    }
+
     override fun onDestroy() {
+        spotifyAdMute?.stop()
+        if (BuildConfig.DEBUG) spotifyProbe.stop()
         settingsScope?.cancel()
         settingsScope = null
         super.onDestroy()
@@ -87,12 +119,34 @@ class RelayNotificationListener : NotificationListenerService() {
             if (action == "POSTED") confirmPendingDismissals()
             return
         }
+        if (sbn.packageName == SPOTIFY_PACKAGE) {
+            val posted = action == "POSTED"
+            if (BuildConfig.DEBUG) spotifyProbe.notificationChanged(sbn, posted)
+            if (posted) {
+                val settings = spotifyMuteSettings
+                val extras = sbn.notification.extras
+                if (settings.spotifyAdMuteEnabled && extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) {
+                    val mute = spotifyAdMute ?: SpotifyAdMute(
+                        Handler(Looper.getMainLooper()),
+                        getSystemService(AudioManager::class.java),
+                    ).also { spotifyAdMute = it }
+                    mute.posted(sbn.key, extras.getCharSequence(Notification.EXTRA_TEXT), settings.spotifyAdMuteSeconds)
+                }
+            } else {
+                spotifyAdMute?.removed(sbn.key)
+            }
+            DebugRecorder.record(action, sbn)
+            return
+        }
         DebugRecorder.record(action, sbn)
         if (action == "POSTED") handleRelayCandidate(sbn)
     }
 
     private fun handleRelayCandidate(sbn: StatusBarNotification) {
-        if (!readyFor(sbn)) return
+        if (!SettingsGate.relayingAllowed() || tracker == null || publisher == null) return
+        if (!TelegramExtractor.matches(sbn.packageName) ||
+            sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
+        ) return
         val currentTracker = checkNotNull(tracker)
         val currentPublisher = checkNotNull(publisher)
         if (dismissals.posted(sbn.key, sbn.postTime)) currentTracker.forgetDismissedSeries(sbn.key)
@@ -138,11 +192,6 @@ class RelayNotificationListener : NotificationListenerService() {
             }
         }
     }
-
-    private fun readyFor(sbn: StatusBarNotification): Boolean =
-        SettingsGate.relayingAllowed() && tracker != null && publisher != null &&
-            TelegramExtractor.matches(sbn.packageName) &&
-            sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0
 
     private fun queueDismissal(sbn: StatusBarNotification, size: Int?, copies: List<Pair<String, Int>>) {
         val supported = copies.size <= 256 &&

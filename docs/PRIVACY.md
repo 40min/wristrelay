@@ -60,3 +60,7 @@ Action cleanup recognizes submitted RemoteInput actions and semantic Mark as rea
 ### Optional expiry (2026-10-29)
 
 Settings also store an off-by-default auto-clear boolean and a bounded duration in minutes (initially one hour). No message history or timestamps are persisted for expiry. Android receives a per-copy timeout only when a new relay copy is posted; no app timer, polling, service, permission or network access is added. Existing copies retain their original timer when settings change. Expiry affects relay copies only, may remove their Garmin mirror, and can remove unread entries; Android/Garmin timing and retention remain outside the app’s control.
+
+### Optional Spotify ad mute
+
+The off-by-default Spotify mute option uses Notification Access to inspect the text of Spotify media notifications while enabled. It adds the normal Android `MODIFY_AUDIO_SETTINGS` permission to change shared media volume. Only the enable flag and timeout duration are persisted. The previous volume and timer are process-local. There is no polling, network access, forwarding or persistent Spotify text.
