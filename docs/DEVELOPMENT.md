@@ -22,4 +22,14 @@ If `java` is not on `PATH`, set `JAVA_HOME` explicitly (verified with Corretto 2
 
 ## CI and releases
 
-GitHub Actions builds the debug APK and runs lint/unit checks. Release signing, release artifacts/checksums and public release acceptance are Phase 7 work. No production signing material is included.
+GitHub Actions runs the same four Gradle tasks shown above. The [release plan](PLAN.md) tracks signing and publication.
+
+## Debug tools
+
+Open **Advanced → Debug** in a debug build. Both tools start off.
+
+- **Start capture** records notification metadata and relay traces, up to 200 events. **Stop capture** leaves the buffer available. Use **Copy all** to export it, or clear it when done.
+- **Start Spotify probe** compares notification and media-session fields. Let a track play through an ad and back to music. Look for `other → ad → other` in the same field. `ad` means the field matches “Advertisement”, and `contains-ad` means it contains the word in a longer value. The screen shows five events. **Copy Spotify log** exports up to 256. Copy before stopping, which clears the trace.
+- **Send test relay notification** posts a test copy on the relay channel with the current auto-clear setting.
+
+Use synthetic messages and review any exported metadata before sharing.

@@ -1,109 +1,45 @@
 # WristRelay
 
-**Every message deserves its own place on your wrist.**
+When Telegram adds a message to an existing Android notification, a Garmin watch can buzz again and still show the first unread message. WristRelay gives each new message its own phone notification so Garmin Connect can mirror it separately. Send ONE, TWO and THREE, and you should be able to read all three on the watch.
 
-WristRelay is an offline Android notification bridge, initially designed for **Telegram → Garmin Connect → Garmin watch**.
+## Set it up
 
-## Why build this?
+1. Open WristRelay on Android 10 or later. Grant **Notification Access** and, on Android 13 or later, allow WristRelay to show notifications.
+2. Turn on **Show Telegram messages on the watch** under **Relay to watch**. WristRelay starts with new arrivals and skips notifications already on the phone.
+3. In Garmin Connect, enable forwarding for WristRelay and disable it for Telegram. Leave Telegram's own Android notifications enabled. The **Garmin Connect guide** in the app walks through this setup.
 
-Telegram can combine several unread messages into one Android notification. In the behavior that motivated this project, the watch alerts again when that notification changes, but keeps showing the first unread message. The next alert adds little information.
+WristRelay copies are silent on the phone. The October 2026 device run confirmed that Garmin could still mirror them with vibration. See the [device results](docs/VALIDATION.md) for the tested setup and open cases.
 
-WristRelay aims to turn each genuinely new message into a separate Android notification that Garmin Connect can mirror. Three messages should become three entries you can browse on the watch:
+## Telegram options
 
-```text
-Telegram conversation          WristRelay → watch
-  ONE                           ONE
-  TWO                           TWO
-  THREE                         THREE
-```
+- **Hide Telegram originals** dismisses a supported Telegram notification once Android shows all its new WristRelay copies. It starts off. It can leave the original visible if the copies can't be confirmed, and Telegram can still alert before dismissal.
+- **Auto-clear relay notifications** gives each new copy its own expiry. It starts off. Set a duration under **Relay cleanup**, from 1 minute to 7 days (initially 60 minutes). Copies already posted keep their original expiry settings. Android controls when they disappear, and a watch mirror may disappear too.
+- Copies can open the chat and carry actions Telegram supplies. On Android 12 and later, supported **Mark as read** and submitted inline **Reply** actions remove just that copy after Android accepts the handoff. Telegram controls action availability and delivery. On Android 10 and 11 the original actions run directly and leave the copy visible.
 
-The goal is to retain all three messages independently. Later arrivals must never overwrite earlier message notifications. Two distinct messages containing “OK” must both arrive; repeated callbacks for the same message must not create duplicates.
+Swiping away a Telegram original leaves its WristRelay copies in place. Media-only messages without text are skipped. If Android or Telegram withholds content, WristRelay can only work with the snapshot it receives.
 
-## How it will work
+## Spotify ad mute
 
-```text
-Telegram notification snapshots
-            ↓
-WristRelay: filter → extract → detect new messages
-            ↓
-One independent Android notification per message
-            ↓
-Garmin Connect → your watch
-```
+Under **Spotify**, you can opt in to muting shared Android media volume when Spotify's notification text contains “Advertisement”. This also silences other apps playing through the same media output.
 
-Telegram keeps its normal phone notifications. In Garmin Connect, users disable forwarding for Telegram and enable it for WristRelay. The optional **Hide Telegram originals** setting (off by default) dismisses a supported Telegram message notification after all fresh copies are confirmed active. It does not sweep existing originals or restore dismissed ones, and cannot prevent Telegram’s initial alert. Group summaries remain. Its own phone notifications are intended to be silent; channel behavior and watch vibration still require device testing.
+WristRelay attempts to restore the old volume when the ad ends, the tracked notification disappears, or the timeout expires. The default is 30 seconds, adjustable from 1 to 300 seconds. If you raise the volume yourself, WristRelay leaves it there. If Android kills the process during a mute, use the phone's volume buttons.
 
-## Current status
+## Build and contribute
 
-**Phone-side relay is implemented and hardening (Epic 2); watch acceptance proved in Phase 0.** On an Android phone + Garmin watch, verification confirmed ONE, TWO, THREE arriving as three independently vibrated, browsable watch entries with Telegram phone notifications untouched (Phase 0 Go, 2026-10-13). The app has a Compose screen with permission controls, a relay switch and an optional Hide Telegram originals switch (persisted, off by default; the relay switch enables master and Telegram together), the Garmin Connect filtering guide in plain language, all styled to the launcher-icon green palette in light and dark. Diagnostic capture is available only in debug builds and starts off. Open Advanced → Debug and select **Start capture** to record notification metadata. **Stop capture** keeps the buffer available until you clear it or the process ends. Relay side: silent Android channel, unique-per-message notification ids, one-entry-per-new-message with no overwrite of earlier entries and baseline handling for restarts/reconnections.
-
-The first milestone was a feasibility APK tested on an Android phone and a Garmin watch: the watch must show **ONE, TWO, THREE**, and all three must remain independently browsable. Production relay development depends on that result. Watch compatibility and battery targets are not yet verified.
-
-## Privacy by design
-
-- Local, event-driven processing; no app internet permission, cloud service or telemetry.
-- No persistent message history or message-body logging.
-- Explicitly enabled source applications only; bounded temporary processing state.
-- No root, accessibility service, polling or permanent foreground service.
-
-Android Notification Access grants broad system-level visibility. WristRelay must filter unrelated apps immediately; it cannot make Android's permission Telegram-only. Read the [privacy and security requirements](docs/PRIVACY.md).
-
-## Build
-
-Open the project in Android Studio, or use the Gradle wrapper with JDK 17+ and Android SDK platform 37.0:
+Use JDK 17+ and Android SDK platform 37.0. Set `ANDROID_HOME` or configure your SDK in Android Studio.
 
 ```sh
-./gradlew assembleDebug
-./gradlew lintDebug testDebugUnitTest detekt
+./gradlew assembleDebug lintDebug testDebugUnitTest detekt
 ```
 
-Set `ANDROID_HOME` to your SDK directory or use an untracked `local.properties`. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. No signing keys or machine-specific configuration belong in Git.
+The debug APK is at `app/build/outputs/apk/debug/app-debug.apk`.
 
-The project uses Kotlin, Jetpack Compose, Gradle Kotlin DSL and one Android application module, with provisional minimum Android 10 (API 29). See [architecture](docs/ARCHITECTURE.md) and [development guidance](docs/DEVELOPMENT.md).
+- [Privacy and permissions](docs/PRIVACY.md)
+- [Development and debug tools](docs/DEVELOPMENT.md)
+- [How the relay works](docs/ARCHITECTURE.md)
+- [Device results and remaining checks](docs/VALIDATION.md)
+- [Release plan](docs/PLAN.md) and [decision history](docs/DECISIONS.md)
 
-## Project documentation
+WristRelay processes notifications locally and saves only settings. It has no internet permission or message history.
 
-| Document | Purpose |
-|---|---|
-| [Context](docs/CONTEXT.md) | Problem, motivation, scope and success criteria |
-| [Development plan](docs/PLAN.md) | Phases, acceptance gates and implementation tasks |
-| [Architecture](docs/ARCHITECTURE.md) | Intended pipeline and current skeleton boundaries |
-| [Decision history](docs/DECISIONS.md) | Why the agreed choices were made |
-| [Privacy and security](docs/PRIVACY.md) | Permissions, retention and release audit |
-| [Device validation](docs/VALIDATION.md) | Android/Garmin acceptance and evidence checklist |
-| [Development](docs/DEVELOPMENT.md) | Build, checks and contribution rules |
-| [Task index](docs/TASKS.md) | Dart epics and implementation tasks |
-
-Additional messaging apps and watch platforms are future work, after the Telegram/Garmin path is proven.
-
-## License
-
-[Apache License 2.0](LICENSE).
-
-## Actions and optional original dismissal
-
-Copies retain valid Telegram-supplied notification actions (including Reply/Mark as read when supplied) and chat-opening intent. Telegram owns these tokens: actions can refer to the conversation/latest state, expire, or stop working after dismissal; each copy does not promise a per-message action. On Android 31+, Mark as read and submitted inline Reply dismiss only the acted-on copy after a successful Android handoff, whether Hide Telegram originals is on or off. On Android 29/30, these actions stay direct and do not automatically dismiss relay copies. Opening or canceling reply input leaves the copy visible. Activity-based actions remain direct and do not dismiss copies. Handoff does not confirm Telegram server delivery; removing the phone copy may remove its mirrored watch entry. Garmin behavior still requires device testing. Original delete intents are never forwarded.
-
-Hiding waits for an event-driven confirmation that every new copy is active and that the original key/post time is still current. Disabled/blocked/denied publication, unsupported snapshots, summaries, duplicates and reconnect baselines never authorize dismissal. Relay copies survive source removal. Own-dismissal removal or a distinct repost post time begins a new snapshot series, retaining identical texts/timestamps. A repost indistinguishable from an old callback (same key and post time before the removal callback) remains ambiguous and may be conservatively skipped; no message ID is available. Pending confirmation is bounded and process-local; missed callbacks leave originals visible.
-
-A publication failure conservatively suspends original hiding for the listener session, since a batch may have submitted only some copies; reconnect baselines existing snapshots and clears this safety guard. Successful relay entries remain untouched.
-
-Action cleanup recognizes submitted RemoteInput actions and semantic Mark as read. For the owner's English Telegram setup, an exact trimmed case-insensitive “Mark as read” label is also accepted when semantic metadata is absent. Unknown/localized actions without recognized semantic metadata, and no-input Reply/compose-opening actions, retain their original direct tokens and do not clean up copies. Inline wrappers require actual text or data results for one of their declared RemoteInput keys before handing off or dismissing; a missing/mismatched submission leaves the copy intact. Only result-key metadata is kept in the system-held token, never submitted text.
-
-## Optional auto-clear
-
-**Auto-clear relay notifications** is saved on this device and off by default. With relay on, enable it under **Relay cleanup**, tap **Auto-clear after 60 minutes** (the initial duration), and enter whole minutes or hours. Select **Apply** to save any duration from 1 minute to 7 days. Android schedules expiry separately for each newly posted relay copy, including debug test copies. Changes affect future notifications only: existing copies keep their original timeout, even when the option is disabled. Telegram originals and other copies are untouched. Expiry can remove unread entries and may remove mirrored watch entries; timing and Garmin propagation still need owner device validation. No polling or background timer service is used.
-
-## Spotify notification probe
-
-In a debug build with Notification Access enabled, go to **Advanced → Debug → Start Spotify probe**. Let Spotify play through a track, an ad, and back to music, then return to WristRelay. Look for `other → ad → other` in a single field and note whether that field changes on notification updates or media-session callbacks. The probe checks notification title and text variants, summary, info, ticker and text lines. It also checks media-session title, artist, album and display fields, plus the title, subtitle and description Android derives from the media metadata. A missing token or denied session is shown in the trace.
-
-The probe shows the latest five events live. **Copy Spotify log** copies up to 256 retained events before you stop the probe and clear the trace. Text is classified as `ad` for the exact label “Advertisement” (ignoring case and surrounding whitespace), `contains-ad` for that word within a longer value, `other` or `missing`. The trace stays in memory until cleared or the process ends. This experiment is independent of Telegram relay and does not send notifications to the watch, log media text, or change volume.
-
-## Optional Spotify ad mute
-
-Enable **Spotify → Mute Spotify ads** to temporarily set Android's shared media volume to zero when Spotify's media notification text contains the word `Advertisement`. Other apps using the same media output are also affected. This option is off by default and uses Notification Access independently of the Telegram relay.
-
-WristRelay restores the previous level when the same media notification supplies nonempty text without the marker, Spotify removes the tracked notification, or the one-shot timeout expires. The timeout defaults to 30 seconds and can be set to 1–300 whole seconds for future mutes. Repeated ad updates leave the original deadline in place. Turning the feature off or losing the listener connection also attempts restoration. If media volume is already above zero at restore time, WristRelay leaves it alone.
-
-The timer runs in the WristRelay process and can be delayed while the phone sleeps. If Android kills or force-stops WristRelay before restoration, use the phone's volume buttons to recover. Restore behavior after audio output changes still needs device verification.
+[Apache License 2.0](LICENSE)

@@ -1,24 +1,20 @@
 # Device validation
 
-Status: active device validation (run log below). Record device OS, Telegram package/version, Garmin Connect version, watch firmware, channel configuration and date for each run. Use synthetic messages; avoid private content in screenshots/logs; withhold device/uid-identifying numbers (model names, serials, notification-key id/uid fragments, battery capacity).
+Phase 0 passed on October 13, 2026. The dated notes below record what was tested on the phone and watch. Use synthetic messages in new runs and record OS, Telegram, Garmin Connect and firmware versions. Keep device identifiers and private notification data out of shared evidence.
 
-## Phase 0 Go/No-Go
+## Checks still open
 
-1. Owner grants Android Notification Access and posting permission.
-2. Owner enables WristRelay forwarding and disables Telegram forwarding in Garmin Connect, preserving Telegram phone notifications.
-3. Send ONE, TWO, THREE to one conversation without opening Telegram.
-4. Confirm extraction of all three from source snapshots.
-5. Publish three independent WristRelay entries.
-6. Confirm correct text and intended alerts, then browse all three on the Garmin watch.
+- Verify the current Garmin Connect menu path and record the tested versions. Rapid arrivals, Bluetooth reconnect and watch privacy/activity settings are outside the recorded watch acceptance.
+- Check settings after a process kill and relaunch on a device. On Android 10 and 11, physically retest relay delivery and direct Telegram actions.
+- Check [original hiding and actions](#optional-original-hiding-and-action-acceptance--partial-matrix-pending-2026-10-22) and [auto-clear](#optional-auto-clear-acceptance-2026-10-29-owner-device-checks-pending) on the phone and Garmin.
+- Verify Spotify volume restoration when the audio output changes.
+- Repeat the release audit and measure a full 24-hour idle/daily-use window.
 
-Pass only if all three remain independently accessible. If Connect or the watch groups/suppresses entries, investigate notification IDs/tags/channels/grouping before declaring Go. The skeleton implements metadata-only debug capture (step 3–5 behavior is not implemented yet); its debug screen is the evidence source for step 4.
+## Retest the original Garmin setup
 
-### Task 0.1 metadata inspection
+Enable WristRelay forwarding and disable Telegram forwarding in Garmin Connect. With Telegram closed, send ONE, TWO and THREE into the same chat. Check the text and alerts on the watch, then browse all three entries independently. Telegram originals should still be visible on the phone with hiding off.
 
-1. Owner installs the debug APK and grants Notification Access to WristRelay.
-2. Owner posts notifications externally (Telegram and, to see the listener working for sure, any other app such as a messaging app or a test tool).
-3. Owner opens WristRelay's debug screen, taps Refresh and records the sanitized lines shown (they contain package/user/key/timing/extra-shape only — safe to share).
-4. Repeat for: first message in a chat, second message in the same chat (update), third message, and after clearing the chat. Note POSTED vs REMOVED lines.
+For metadata, start capture under **Advanced → Debug** before sending. Check posted and removed events after sending each message and after dismissing the Telegram notification.
 
 ### Task 2.4 owner run script (feeds ADR-008 decision — completed 2026-10-13)
 
@@ -33,13 +29,9 @@ Run once during live daily use, relay toggles on, tokens ONE/TWO/THREE/OK only. 
 
 Results recorded in the Run log below; the outcome became ADR-012 (no automatic cleanup).
 
-### Task 2.3 persistent settings (open device item)
+### Silent relay channel
 
-Owner live check: after reinstall, toggles survive a process kill and app relaunch; the "Send test relay notification" button posts one silent-channel entry (watch mirrors it); the guide maps to what the owner's Connect version actually shows (record exact menu path per the 0.3 follow-up).
-
-### Task 2.2 silent channel (open device item)
-
-Phone: relay notifications are silent by design (new channel `wristrelay.relayed_messages_silent`, IMPORTANCE_LOW, no sound; the legacy loud prototype channel is untouched). Watch: **owner-confirmed 2026-10-13** — the test relay notification reached the Garmin watch with vibration through the silent channel; mirroring with the silent channel is verified. Any later watch change is processed as a regular issue (owner decision 2026-10-13).
+On October 13, 2026, a WristRelay test notification posted through the silent channel reached the Garmin watch with vibration. The older, audible prototype channel is kept so Android can retain any notifications still using it.
 
 ## Parser variant coverage (task 2.1)
 
@@ -66,10 +58,6 @@ Fixture statements (unit-tested, synthetic vocabulary only) vs. device-unverifie
 | Access/posting revoked | Graceful stop and accurate status |
 | Locked phone / burst / Bluetooth reconnect | Documented supported behavior without uncontrolled replay |
 | Watch privacy / activities | Behavior matches configured settings |
-
-## Performance evidence
-
-Measure typical/burst processing and 24-hour idle/daily workload under stock battery restrictions. Targets are <20ms typical processing, <30MB normal memory, additional battery aim <1% per day, negligible idle CPU and zero app network traffic. Record actual results, measurement method and deviations; do not present targets as achievements.
 
 ## Run log
 
@@ -168,7 +156,7 @@ Sanitized evidence: owner's staged replies of 2026-10-13 (Stages 2–3, S1, R1�
 
 Result: Pass (owner-verified subset)
 
-Go/No-Go and outstanding issues: owner decision 2026-10-13 — the remaining watch-side cases (rapid arrivals, Bluetooth reconnect, watch privacy/activity settings, exact Garmin Connect menu path and versions) are NOT reproduced on demand; anything discovered in daily use will be processed as a regular issue. Excellent 3.3 notes: record OS/Telegram/Connect versions for release docs when convenience allows.
+Go/No-Go and outstanding issues: owner decision 2026-10-13 — the remaining watch-side cases (rapid arrivals, Bluetooth reconnect, watch privacy/activity settings, exact Garmin Connect menu path and versions) are NOT reproduced on demand; anything discovered in daily use will be processed as a regular issue. Record OS, Telegram and Connect versions for release docs.
 
 ### 2026-10-13 — Task 2.4 owner evidence run R1–R6
 
@@ -189,7 +177,7 @@ Sanitized evidence: owner's one-line answers per the script (single facts, no me
 
 Result: Pass
 
-Go/No-Go and outstanding issues: ADR-012 recorded (no automatic cleanup — see DECISIONS.md). Phone-side daily-use behaviors are validated; the remaining reliability-matrix rows are watch-side and belong to task 3.1 (locked phone, Bluetooth reconnect, watch privacy settings, long/silent mirroring).
+This run informed [ADR-012](DECISIONS.md), which keeps relay copies when Telegram removes its original.
 
 ### Template for future runs
 
@@ -222,7 +210,7 @@ Owner reports the latest debug APK's phone action cleanup and expanded multiline
 
 Phone and Garmin retest: publish two independent copies; Mark as read on one must dismiss only that copy. Open Reply and cancel: both copies stay. Submit Reply: only its copy disappears after Android handoff. Repeat with Hide Telegram originals on and off; check reply delivery separately from UI dismissal. Expired Telegram tokens must retain copies. Activity-based actions intentionally stay direct and retain copies. Confirm whether removing a phone copy removes its mirrored watch entry. Synthetic receiver tests cover exact-copy cleanup, reply-result transport, canceled tokens, malformed routing and stale-wrapper ID reuse; they cannot prove Telegram delivery or Garmin behavior.
 
-Action cleanup recognizes submitted RemoteInput actions and semantic Mark as read. For the owner's English Telegram setup, an exact trimmed case-insensitive “Mark as read” label is also accepted when semantic metadata is absent. Unknown/localized actions without recognized semantic metadata, and no-input Reply/compose-opening actions, retain their original direct tokens and do not clean up copies. Inline wrappers require actual text or data results for one of their declared RemoteInput keys before handing off or dismissing; a missing/mismatched submission leaves the copy intact. Only result-key metadata is kept in the system-held token, never submitted text. On Android 29/30 all completion actions remain direct, so Mark as read and inline Reply do not automatically dismiss relay copies there; Android 31+ supports the per-copy cleanup wrappers. API 29/30 Robolectric regression coverage verifies the original Mark as read and inline Reply tokens remain attached to published copies.
+See [ADR-015](DECISIONS.md#adr-015--dismiss-the-explicitly-acted-on-copy-after-handoff-2026-10-22) for the action matching rules. API 29/30 Robolectric coverage verifies that the original Mark as read and inline Reply tokens remain attached to the copies.
 
 ## Expanded long-text presentation — owner-reported device acceptance (2026-10-22)
 
@@ -239,7 +227,7 @@ Robolectric checks cover default-off timeout, minute/hour conversion and bounds,
 - Confirm Reply/Mark as read still removes only the acted-on copy after successful handoff; source removal still leaves relay copies alone.
 - Check the settings and duration dialog in light and dark themes, with large text and on a narrow screen. Cancel or dismiss the dialog after editing and verify the saved duration stays the same. Switch units and verify an exact conversion or an empty field. Turn relay off and verify the duration button is disabled. Verify the permission statuses, Garmin guide and debug controls under Advanced. Empty, zero, negative, fractional, overflowing and out-of-range input must show validation and must not save.
 
-### 2026-11-17 — Telegram delivery across listener state changes
+## 2026-11-17 — Telegram delivery across listener state changes
 
 Robolectric passed on API 29, 30, and 34. Reconnecting with 17 active Telegram
 conversations and receiving a restored snapshot produced no historical copies.
@@ -249,3 +237,20 @@ the original. After reconnect, a fresh source was hidden only after its relay
 copy was confirmed active.
 
 Physical Android 29/30 and Garmin delivery for these scenarios remain unverified.
+
+
+## October 2026 audit and measurements
+
+The October 13 static audit through `1aedc60` checked the manifest, backup exclusions, settings-only persistence, metadata-only diagnostics, self-notification filtering and dependencies. It found no app internet access, message persistence or external telemetry. The build at that point had only the posting permission. The current app also declares audio settings access for Spotify muting.
+
+### Measurements from the same day
+
+The owner used stock battery optimization and sent 14 synthetic messages in a burst. USB `dumpsys` reported statistics since the last full charge, a 4.5-hour window of heavy interactive use.
+
+| Measurement | Result on that build |
+|---|---|
+| Relay processing | All 14 messages relayed. App processing took 5–7 ms each, below the 20 ms target. System callback latency was measured separately at about 300 ms. |
+| CPU | 830 ms user time and 1.65 s kernel time over 4.5 hours. |
+| Battery | Estimated 1.80 mAh over the window, about 0.04% of a charge. A linear extrapolation gives about 0.1% per day. A full-day run remains open. |
+| Network | No traffic attributed to WristRelay in the device stats. |
+| Memory | Listener only, UI closed: 31.4 MB private PSS and 50.3 MB total PSS. With the UI paused: 36.2 MB private and 62.9 MB total. [ADR-013](DECISIONS.md) records why the project retired the original 30 MB target. |
