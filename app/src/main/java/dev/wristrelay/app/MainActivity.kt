@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,11 +49,14 @@ import dev.wristrelay.app.debug.DebugFormat
 import dev.wristrelay.app.debug.SpotifyProbe
 import dev.wristrelay.app.model.RelayMessage
 import dev.wristrelay.app.relay.RelayNotificationPublisher
+import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.settings.SettingsGate
 import dev.wristrelay.app.settings.SettingsStore
 import dev.wristrelay.app.ui.RelaySettingsScreen
 import dev.wristrelay.app.ui.SettingsSection
 import dev.wristrelay.app.ui.WristRelayTheme
+import java.io.IOException
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -75,7 +79,7 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("WristRelay", style = MaterialTheme.typography.headlineLarge)
-                        RelaySettingsContent()
+                        RelaySettingsContent(remember { SettingsStore(applicationContext) })
                         SettingsSection("Advanced") {
                             PermissionControls(permissionRequest)
                             GarminGuide()
@@ -231,33 +235,6 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun RelaySettingsContent() {
-        val store = remember { SettingsStore(applicationContext) }
-        val loadedSettings by store.flow.collectAsState(initial = null)
-        val scope = rememberCoroutineScope()
-        var saving by remember { mutableStateOf(false) }
-        val settings = loadedSettings
-        if (settings == null) {
-            Text("Loading saved settings…", style = MaterialTheme.typography.bodySmall)
-            return
-        }
-        RelaySettingsScreen(settings, enabled = !saving) { edit ->
-            if (!saving) {
-                saving = true
-                scope.launch {
-                    try {
-                        val updated = edit(store.current())
-                        store.save(updated)
-                        SettingsGate.update(updated)
-                    } finally {
-                        saving = false
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
     private fun GarminGuide() {
         var expanded by remember { mutableStateOf(false) }
         TextButton(onClick = { expanded = !expanded }) {
@@ -275,5 +252,50 @@ class MainActivity : ComponentActivity() {
                 "existing settings.",
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+@Composable
+internal fun RelaySettingsContent(store: SettingsStore) {
+    var loadedSettings by remember { mutableStateOf<RelaySettings?>(null) }
+    var readFailed by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(store) {
+        store.flow.catch { failure ->
+            if (failure !is IOException) throw failure
+            readFailed = true
+            loadedSettings = null
+        }.collect { loadedSettings = it }
+    }
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    val settings = loadedSettings
+    if (settings == null) {
+        if (readFailed) {
+            Text("Couldn’t load saved settings.", color = MaterialTheme.colorScheme.error)
+        } else {
+            Text("Loading saved settings…", style = MaterialTheme.typography.bodySmall)
+        }
+        return
+    }
+    if (saveFailed) {
+        Text("Couldn’t save the change. Try again.", color = MaterialTheme.colorScheme.error)
+    }
+    RelaySettingsScreen(settings, enabled = !saving) { edit ->
+        if (!saving) {
+            saving = true
+            saveFailed = false
+            scope.launch {
+                try {
+                    val updated = edit(store.current())
+                    store.save(updated)
+                    SettingsGate.update(updated)
+                } catch (_: IOException) {
+                    saveFailed = true
+                } finally {
+                    saving = false
+                }
+            }
+        }
     }
 }

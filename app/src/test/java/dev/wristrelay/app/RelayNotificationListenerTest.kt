@@ -3,14 +3,24 @@ package dev.wristrelay.app
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioManager
+import android.media.session.MediaSession
+import android.os.Bundle
+import android.os.Looper
 import android.service.notification.StatusBarNotification
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.preferencesOf
 import androidx.test.core.app.ApplicationProvider
 import dev.wristrelay.app.debug.DebugEventStore
 import dev.wristrelay.app.debug.DebugFormat
 import dev.wristrelay.app.processing.MessageTracker
 import dev.wristrelay.app.relay.RelayNotificationPublisher
+import dev.wristrelay.app.settings.FaultingSettingsDataStore
 import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.settings.SettingsGate
+import dev.wristrelay.app.settings.SettingsStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,9 +41,52 @@ class RelayNotificationListenerTest {
     @Before
     fun setUp() {
         listener = Robolectric.buildService(RelayNotificationListener::class.java).create().get()
+        inject("settingsAvailable", true)
         inject("tracker", MessageTracker())
         inject("publisher", RelayNotificationPublisher(listener))
         SettingsGate.update(RelaySettings(true, true, true))
+    }
+
+    @Test
+    fun settingsReadFailureStopsRelayingAndRestoresMutedVolume() {
+        val dataStore = FaultingSettingsDataStore(
+            preferencesOf(
+                booleanPreferencesKey("master_enabled") to true,
+                booleanPreferencesKey("telegram_enabled") to true,
+                booleanPreferencesKey("spotify_ad_mute_enabled") to true,
+            ),
+        )
+        SettingsGate.update(RelaySettings())
+        listener.openSettings = { SettingsStore(dataStore, CoroutineScope(Dispatchers.Main)) }
+        val mainLooper = shadowOf(Looper.getMainLooper())
+        val audio = listener.getSystemService(AudioManager::class.java)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, 5, 0)
+
+        listener.onListenerConnected()
+        mainLooper.idle()
+        val mediaSession = MediaSession(context, "test-ad")
+        val notification = Notification.Builder(context, "spotify")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentText("Advertisement")
+            .addExtras(Bundle().apply { putParcelable(Notification.EXTRA_MEDIA_SESSION, mediaSession.sessionToken) })
+            .build()
+        val ad = StatusBarNotification(
+            "com.spotify.music", "com.spotify.music", 2, null, 1000, 0, 0,
+            notification, android.os.Process.myUserHandle(), 1000,
+        )
+        listener.onNotificationPosted(ad)
+        assertEquals(0, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        listener.onNotificationPosted(source())
+        assertEquals(1, manager.activeNotifications.size)
+
+        dataStore.failRead.complete(Unit)
+        mainLooper.idle()
+        listener.onNotificationPosted(source(time = 2000, id = 8))
+
+        assertEquals(5, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        assertEquals(1, manager.activeNotifications.size)
+        listener.onListenerDisconnected()
+        mediaSession.release()
     }
 
     private fun inject(name: String, value: Any) {

@@ -26,7 +26,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 /**
  * Relay listener: extracts MessagingStyle messages from Telegram snapshots
@@ -44,6 +46,9 @@ class RelayNotificationListener : NotificationListenerService() {
     private var publisher: RelayNotificationPublisher? = null
     private var settingsScope: CoroutineScope? = null
 
+    internal var openSettings = { SettingsStore(applicationContext) }
+    private var settingsAvailable = false
+    private val relayingAllowed: Boolean get() = settingsAvailable && SettingsGate.relayingAllowed()
     private var spotifyMuteSettings = RelaySettings()
     private var spotifyAdMute: SpotifyAdMute? = null
     private val spotifyProbe by lazy { SpotifyProbeCoordinator(this) { activeNotifications } }
@@ -56,6 +61,7 @@ class RelayNotificationListener : NotificationListenerService() {
         publisher = RelayNotificationPublisher(this)
         // Load settings into the synchronous gate; activation re-baselines existing conversations.
         settingsScope?.cancel()
+        settingsAvailable = false
         spotifyMuteSettings = RelaySettings()
         spotifyAdMute?.stop()
         val activationWatcher = RelayActivationWatcher {
@@ -65,10 +71,16 @@ class RelayNotificationListener : NotificationListenerService() {
         }
         settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope ->
             scope.launch {
-                SettingsStore(applicationContext).flow.collect { settings ->
+                openSettings().flow.catch { failure ->
+                    if (failure !is IOException) throw failure
+                    settingsAvailable = false
+                    pendingDismissals.clear()
+                    spotifyAdMute?.stop()
+                }.collect { settings ->
                     SettingsGate.update(settings)
                     activationWatcher.update(settings)
                     spotifyMuteSettings = settings
+                    settingsAvailable = true
                     if (!settings.spotifyAdMuteEnabled) spotifyAdMute?.stop()
                 }
             }
@@ -84,6 +96,7 @@ class RelayNotificationListener : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         settingsScope?.cancel()
+        settingsAvailable = false
         spotifyMuteSettings = RelaySettings()
         spotifyAdMute?.stop()
         if (BuildConfig.DEBUG) {
@@ -125,7 +138,7 @@ class RelayNotificationListener : NotificationListenerService() {
             if (posted) {
                 val settings = spotifyMuteSettings
                 val extras = sbn.notification.extras
-                if (settings.spotifyAdMuteEnabled && extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) {
+                if (settingsAvailable && settings.spotifyAdMuteEnabled && extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) {
                     val mute = spotifyAdMute ?: SpotifyAdMute(
                         Handler(Looper.getMainLooper()),
                         getSystemService(AudioManager::class.java),
@@ -143,7 +156,7 @@ class RelayNotificationListener : NotificationListenerService() {
     }
 
     private fun handleRelayCandidate(sbn: StatusBarNotification) {
-        if (!SettingsGate.relayingAllowed() || tracker == null || publisher == null) return
+        if (!relayingAllowed || tracker == null || publisher == null) return
         if (!TelegramExtractor.matches(sbn.packageName) ||
             sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
         ) return
@@ -212,7 +225,7 @@ class RelayNotificationListener : NotificationListenerService() {
     }
 
     private fun confirmPendingDismissals() {
-        if (publicationFailed || !SettingsGate.relayingAllowed() || !SettingsGate.current.hideTelegramOriginals) {
+        if (publicationFailed || !relayingAllowed || !SettingsGate.current.hideTelegramOriginals) {
             pendingDismissals.clear()
             return
         }
