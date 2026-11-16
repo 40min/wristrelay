@@ -4,11 +4,11 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import androidx.core.app.NotificationCompat
 import androidx.annotation.VisibleForTesting
-import dev.wristrelay.app.settings.RelaySettings
+import androidx.core.app.NotificationCompat
 import dev.wristrelay.app.R
 import dev.wristrelay.app.model.RelayMessage
+import dev.wristrelay.app.settings.RelaySettings
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -20,6 +20,9 @@ fun interface RelayPublisher {
     fun publish(messages: List<RelayMessage>): RelayPublication
 }
 
+/** Android identity shared by one relayed notification's tag and integer ID. */
+data class RelayNotificationIdentity(val tag: String, val id: Int)
+
 /**
  * Result of one publication attempt: the identities Android accepted,
  * in requested order, stopping at the first submission failure.
@@ -29,7 +32,7 @@ fun interface RelayPublisher {
  * through it, and unsubmitted copies retry on the next qualifying event.
  */
 data class RelayPublication(
-    val submittedIdentities: List<Pair<String, Int>>,
+    val submittedIdentities: List<RelayNotificationIdentity>,
     val requestedCount: Int,
     val failureReason: String? = null,
 ) {
@@ -97,13 +100,13 @@ class RelayNotificationPublisher internal constructor(
         }
         checkNotNull(notificationManager)
         skipActiveIdentities(notificationManager)
-        val submitted = mutableListOf<Pair<String, Int>>()
+        val submitted = mutableListOf<RelayNotificationIdentity>()
         val failureReason = try {
             for (message in messages) {
                 val id = nextNotificationId.getAndIncrement()
                 val tag = tagFor(id)
                 submit(notificationManager, tag, id, buildCopy(message, source, sourcePackage, id, settings))
-                submitted.add(tag to id)
+                submitted.add(RelayNotificationIdentity(tag, id))
             }
             null
         } catch (failure: SecurityException) {

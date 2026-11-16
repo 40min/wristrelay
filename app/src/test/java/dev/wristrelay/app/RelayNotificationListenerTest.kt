@@ -18,8 +18,6 @@ import dev.wristrelay.app.debug.DebugFormat
 import dev.wristrelay.app.settings.FaultingSettingsDataStore
 import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.settings.SettingsStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -53,7 +51,6 @@ class RelayNotificationListenerTest {
                         error("These tests only collect settings")
                     }
                 },
-                CoroutineScope(Dispatchers.Main),
             )
         }
     }
@@ -88,7 +85,7 @@ class RelayNotificationListenerTest {
                 booleanPreferencesKey("spotify_ad_mute_enabled") to true,
             ),
         )
-        listener.openSettings = { SettingsStore(dataStore, CoroutineScope(Dispatchers.Main)) }
+        listener.openSettings = { SettingsStore(dataStore) }
         val audio = listener.getSystemService(AudioManager::class.java)
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, 5, 0)
 

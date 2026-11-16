@@ -11,8 +11,6 @@ import dev.wristrelay.app.settings.SettingsGate
 import dev.wristrelay.app.settings.SettingsStore
 import dev.wristrelay.app.ui.RelaySettingsContent
 import dev.wristrelay.app.ui.WristRelayTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -54,7 +52,7 @@ class RelaySettingsContentTest {
     private fun relaySwitch() = compose.onNodeWithContentDescription("Show Telegram messages on the watch")
 
     private fun showSettings(dataStore: FaultingSettingsDataStore) {
-        val store = SettingsStore(dataStore, CoroutineScope(Dispatchers.Main))
+        val store = SettingsStore(dataStore)
         compose.setContent { WristRelayTheme { RelaySettingsContent(store) } }
     }
 }

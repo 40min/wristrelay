@@ -1,6 +1,7 @@
 package dev.wristrelay.app.processing
 
 import dev.wristrelay.app.model.RelayMessage
+import dev.wristrelay.app.relay.RelayNotificationIdentity
 import dev.wristrelay.app.relay.RelayPublisher
 
 /**
@@ -12,7 +13,7 @@ import dev.wristrelay.app.relay.RelayPublisher
  */
 class TelegramRelayPipeline(
     private val tracker: MessageTracker,
-    private val publisher: dev.wristrelay.app.relay.RelayPublisher,
+    private val publisher: RelayPublisher,
 ) {
 
     fun run(conversationKey: String, snapshot: List<RelayMessage>?): RelayResult =
@@ -51,7 +52,7 @@ class TelegramRelayPipeline(
 }
 
 sealed interface RelayResult {
-    data class Published(val identities: List<Pair<String, Int>>) : RelayResult {
+    data class Published(val identities: List<RelayNotificationIdentity>) : RelayResult {
         val count: Int get() = identities.size
     }
     data object Duplicate : RelayResult

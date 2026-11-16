@@ -4,16 +4,12 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 val Context.settingsDataStore by preferencesDataStore(name = "wristrelay_settings")
 
@@ -24,12 +20,8 @@ val Context.settingsDataStore by preferencesDataStore(name = "wristrelay_setting
  */
 class SettingsStore(
     private val dataStore: DataStore<Preferences>,
-    private val observerScope: CoroutineScope,
 ) {
-    constructor(context: Context) : this(
-        context.settingsDataStore,
-        CoroutineScope(SupervisorJob() + Dispatchers.IO),
-    )
+    constructor(context: Context) : this(context.settingsDataStore)
 
     val flow: Flow<RelaySettings> = dataStore.data.map { prefs: Preferences ->
         RelaySettings(
@@ -57,16 +49,6 @@ class SettingsStore(
             prefs[HIDE_ORIGINALS] = settings.hideTelegramOriginals
             prefs[AUTO_CLEAR] = settings.autoClearEnabled
             prefs[AUTO_CLEAR_MINUTES] = settings.autoClearMinutes
-        }
-    }
-
-    /**
-     * Keeps the synchronous [SettingsGate] mirror aligned with persisted
-     * settings; returns the job so the listener can cancel it.
-     */
-    fun observe(onChange: (RelaySettings) -> Unit) {
-        observerScope.launch {
-            flow.collect(onChange)
         }
     }
 

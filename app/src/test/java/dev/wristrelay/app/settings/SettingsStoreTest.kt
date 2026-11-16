@@ -9,12 +9,8 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -24,7 +20,7 @@ import org.robolectric.annotation.Config
  * DataStore persistence is verified on an isolated file per test so the
  * module singleton used in production is not shared with unit state.
  * Restart persistence itself is a DataStore file contract; the unit suite
- * covers the round trip and the synchronous-gate mirror.
+ * covers the settings round trip.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -32,18 +28,13 @@ class SettingsStoreTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
-    @Before
-    fun resetGate() {
-        SettingsGate.update(RelaySettings())
-    }
-
     private fun isolatedStore(
         scope: CoroutineScope = CoroutineScope(Dispatchers.IO + Job()),
     ): SettingsStore {
         context.filesDir.mkdirs()
         val file = File(context.filesDir, "${UUID.randomUUID()}.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
-        return SettingsStore(dataStore, scope)
+        return SettingsStore(dataStore)
     }
 
     @Test
@@ -78,20 +69,6 @@ class SettingsStoreTest {
     }
 
     @Test
-    fun `observer keeps the synchronous gate aligned`() = runBlocking {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        try {
-            val store = isolatedStore(scope)
-            store.observe(SettingsGate::update)
-            store.save(RelaySettings(masterEnabled = true, telegramEnabled = true))
-
-            assertTrue(SettingsGate.relayingAllowed())
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    @Test
     fun `hide originals persists independently when relay is disabled`() = runBlocking {
         val store = isolatedStore()
         store.save(RelaySettings(hideTelegramOriginals = true))
@@ -107,7 +84,7 @@ class SettingsStoreTest {
             prefs[androidx.datastore.preferences.core.booleanPreferencesKey("master_enabled")] = true
             prefs[androidx.datastore.preferences.core.booleanPreferencesKey("telegram_enabled")] = true
         }
-        assertEquals(RelaySettings(true, true, false), SettingsStore(dataStore, scope).current())
+        assertEquals(RelaySettings(true, true, false), SettingsStore(dataStore).current())
     }
 
     @Test
@@ -155,7 +132,7 @@ class SettingsStoreTest {
         dataStore.edit { prefs ->
             prefs[androidx.datastore.preferences.core.intPreferencesKey("auto_clear_minutes")] = -1
         }
-        assertEquals(RelaySettings(), SettingsStore(dataStore, scope).current())
+        assertEquals(RelaySettings(), SettingsStore(dataStore).current())
     }
 
 }

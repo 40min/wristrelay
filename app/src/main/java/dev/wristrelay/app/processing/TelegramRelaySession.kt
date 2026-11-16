@@ -3,6 +3,7 @@ package dev.wristrelay.app.processing
 import android.app.Notification
 import android.service.notification.StatusBarNotification
 import dev.wristrelay.app.debug.DebugRecorder
+import dev.wristrelay.app.relay.RelayNotificationIdentity
 import dev.wristrelay.app.relay.RelayNotificationPublisher
 import dev.wristrelay.app.relay.RelayPublisher
 import dev.wristrelay.app.settings.RelaySettings
@@ -16,7 +17,7 @@ internal class TelegramRelaySession(
     private val activeNotifications: () -> Array<StatusBarNotification>?,
     private val cancelNotification: (String) -> Unit,
 ) {
-    private data class PendingDismissal(val postTime: Long, val copies: List<Pair<String, Int>>)
+    private data class PendingDismissal(val postTime: Long, val copies: List<RelayNotificationIdentity>)
 
     private val tracker = MessageTracker()
     private val dismissals = SourceDismissalTracker()
@@ -89,7 +90,7 @@ internal class TelegramRelaySession(
     private fun queueDismissal(
         sbn: StatusBarNotification,
         size: Int?,
-        copies: List<Pair<String, Int>>,
+        copies: List<RelayNotificationIdentity>,
         hideOriginals: Boolean,
     ) {
         val supported = copies.size <= 256 &&
@@ -110,8 +111,8 @@ internal class TelegramRelaySession(
         try {
             val active = activeNotifications() ?: return
             val ready = pendingDismissals.filter { (key, pending) ->
-                pending.copies.isNotEmpty() && pending.copies.all { (tag, id) ->
-                    active.any { it.packageName == packageName && it.tag == tag && it.id == id }
+                pending.copies.isNotEmpty() && pending.copies.all { copy ->
+                    active.any { it.packageName == packageName && it.tag == copy.tag && it.id == copy.id }
                 } && active.any { it.key == key && it.postTime == pending.postTime }
             }
             ready.forEach { (key, pending) ->

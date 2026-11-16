@@ -24,11 +24,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import dev.wristrelay.app.R
 import dev.wristrelay.app.settings.RelaySettings
 
 @Composable
@@ -119,7 +121,7 @@ private fun SpotifyAdMuteSettings(
         )
         if (settings.spotifyAdMuteEnabled) {
             OutlinedButton(onClick = { editingTimeout = true }, enabled = enabled) {
-                Text("Restore after at most ${settings.spotifyAdMuteSeconds} s")
+                Text(stringResource(R.string.spotify_mute_timeout, settings.spotifyAdMuteSeconds))
             }
         }
     }
@@ -151,7 +153,9 @@ private fun SpotifyTimeoutDialog(savedSeconds: Int, onDismiss: () -> Unit, onApp
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 isError = seconds == null,
-                supportingText = { Text("Enter 1–$maximum whole seconds. Applies to future mutes.") },
+                supportingText = {
+                    Text(stringResource(R.string.spotify_timeout_help, maximum))
+                },
             )
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

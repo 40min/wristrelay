@@ -1,6 +1,7 @@
 package dev.wristrelay.app.processing
 
 import dev.wristrelay.app.model.RelayMessage
+import dev.wristrelay.app.relay.RelayNotificationIdentity
 import dev.wristrelay.app.relay.RelayPublication
 import dev.wristrelay.app.relay.RelayPublisher
 import org.junit.Assert.assertEquals
@@ -40,7 +41,7 @@ class TelegramRelayPipelineTest {
             val submitted = submittedPerCall(calls).coerceAtMost(messages.size)
             return RelayPublication(
                 submittedIdentities = messages.take(submitted)
-                    .mapIndexed { index, _ -> "fixture-$calls-$index" to calls * 1_000 + index },
+                    .mapIndexed { index, _ -> RelayNotificationIdentity("fixture-$calls-$index", calls * 1_000 + index) },
                 requestedCount = messages.size,
                 failureReason = if (submitted == messages.size) null else "fixture publication failure",
             )

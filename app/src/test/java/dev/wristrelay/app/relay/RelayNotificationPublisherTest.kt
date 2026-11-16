@@ -64,7 +64,7 @@ class RelayNotificationPublisherTest {
         assertEquals(1, result.submittedCount)
         assertTrue(!result.fullySubmitted)
         val entry = posted().single()
-        assertEquals(listOf(entry.tag to entry.id), result.submittedIdentities)
+        assertEquals(listOf(RelayNotificationIdentity(entry.tag!!, entry.id)), result.submittedIdentities)
     }
 
     @Test
