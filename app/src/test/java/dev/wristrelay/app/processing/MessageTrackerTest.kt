@@ -52,6 +52,7 @@ class MessageTrackerTest {
     @Test
     fun `repeated identical callback emits nothing`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         val snapshot = listOf(message("one"), message("two"), message("three"))
         tracker.relay(convKey, snapshot)
         assertEquals(emptyList<Any>(), tracker.relay(convKey, snapshot))
@@ -60,6 +61,7 @@ class MessageTrackerTest {
     @Test
     fun `two identical texts are distinct entries and both delivered`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(convKey, listOf(message("ok"), message("ok")))
         val bothAgain = listOf(message("ok"), message("ok"), message("ok"), message("ok"))
         assertEquals(
@@ -71,6 +73,7 @@ class MessageTrackerTest {
     @Test
     fun `shrink resets cursor without emitting old entries`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         val three = listOf(message("one"), message("two"), message("three"))
         tracker.relay(convKey, three)
         // Source cleared to one entry; nothing emitted.
@@ -106,24 +109,47 @@ class MessageTrackerTest {
     }
 
     @Test
-    fun `tracked conversations are bounded by eviction count`() {
-        val tracker = MessageTracker(maxTrackedConversations = 2)
-        val initial = listOf(message("one"))
-        tracker.relay("conv-key-a", initial)
-        tracker.relay("conv-key-b", initial)
-        // At cap 2, inserting c evicts the eldest cursor (a); its state is
-        // gone, so a's next two-entry snapshot is fully new again.
-        tracker.relay("conv-key-c", initial)
+    fun `cold single emits while cold multi-entry snapshot baselines and then grows`() {
+        val tracker = MessageTracker()
+        assertEquals(listOf("one"), tracker.relay(convKey, listOf(message("one"))).map { it.text })
+
+        val otherKey = "cold-multi"
+        val batch = listOf(message("old-one"), message("old-two"))
+        assertEquals(emptyList<Any>(), tracker.relay(otherKey, batch))
+        assertEquals(listOf("new"), tracker.relay(otherKey, batch + message("new")).map { it.text })
+    }
+
+    @Test
+    fun `runtime eviction of more than sixteen conversations baselines then detects growth`() {
+        val tracker = MessageTracker()
+        val keys = (0..16).map { "runtime-$it" }
+        keys.forEach { key -> tracker.relay(key, listOf(message("old-$key"))) }
+
+        val evicted = keys.first()
+        assertEquals(emptyList<Any>(), tracker.relay(evicted, listOf(message("old-$evicted"), message("also-old"))))
         assertEquals(
-            listOf("one", "one"),
-            tracker.relay("conv-key-a", listOf(message("one"), message("one"))).map { it.text },
+            listOf("new"),
+            tracker.relay(evicted, listOf(message("old-$evicted"), message("also-old"), message("new"))).map { it.text },
         )
+    }
+
+    @Test
+    fun `startup baseline overflow absorbs evicted multi-entry snapshot and detects growth`() {
+        val tracker = MessageTracker()
+        val keys = (0..16).map { "startup-$it" }
+        keys.forEach { key -> tracker.markBaseline(key, listOf(message("old-$key"))) }
+
+        val evicted = keys.first()
+        val restored = listOf(message("old-$evicted"), message("still-old"))
+        assertEquals(emptyList<Any>(), tracker.relay(evicted, restored))
+        assertEquals(listOf("new"), tracker.relay(evicted, restored + message("new")).map { it.text })
     }
 
     @Test
     fun `baseline resets replay after restart or rebind`() {
         // Process life one: three messages relayed.
         val firstRun = MessageTracker()
+        firstRun.forgetDismissedSeries(convKey)
         assertEquals(
             listOf("one", "two", "three"),
             firstRun.relay(
@@ -181,6 +207,7 @@ class MessageTrackerTest {
         // Owner repro 2026-10-13: relay through a series, then Telegram
         // rebuilds the array fresh with only the newest message inside.
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(
             convKey,
             listOf(
@@ -208,6 +235,7 @@ class MessageTrackerTest {
     @Test
     fun `shrink to older already-relayed leftovers emits nothing`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(
             convKey,
             listOf(
@@ -232,6 +260,7 @@ class MessageTrackerTest {
     @Test
     fun `shrink with leftovers plus newer entry emits only the newer part`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(
             convKey,
             listOf(
@@ -271,6 +300,7 @@ class MessageTrackerTest {
     @Test
     fun `entries without timestamps keep conservative shrink behavior`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(
             convKey,
             listOf(
@@ -309,6 +339,7 @@ class MessageTrackerTest {
     @Test
     fun `detection does not advance the cursor until submission is reported`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         val snapshot = listOf(message("one", time = 1000), message("two", time = 2000))
         assertEquals(listOf("one", "two"), tracker.detect(convKey, snapshot).map { it.text })
         // Detection alone committed nothing: the same snapshot classifies
@@ -319,6 +350,7 @@ class MessageTrackerTest {
     @Test
     fun `full submission failure leaves the cursor untouched so the snapshot retries`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         val snapshot = listOf(message("one", time = 1000), message("two", time = 2000))
         val fresh = tracker.detect(convKey, snapshot)
         tracker.advanceThroughSubmitted(convKey, snapshot, fresh, 0)
@@ -328,6 +360,7 @@ class MessageTrackerTest {
     @Test
     fun `partial submission advances only through the submitted prefix`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         val snapshot = listOf(message("one", time = 1000), message("two", time = 2000), message("three", time = 3000))
         val fresh = tracker.detect(convKey, snapshot)
         tracker.advanceThroughSubmitted(convKey, snapshot, fresh, 1)
@@ -346,6 +379,7 @@ class MessageTrackerTest {
     @Test
     fun `unsubmitted rebuilt-shrink entries stay newer than the watermark and retry`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(
             convKey,
             listOf(
@@ -365,6 +399,7 @@ class MessageTrackerTest {
     @Test
     fun `partial submission of a rebuilt-shrink slice retries only the unsubmitted remainder`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
         tracker.relay(
             convKey,
             listOf(

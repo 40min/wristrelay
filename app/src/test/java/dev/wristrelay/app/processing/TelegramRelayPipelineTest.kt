@@ -118,6 +118,7 @@ class TelegramRelayPipelineTest {
     @Test
     fun `burst inside one snapshot publishes every arrival`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("key-a")
         val publisher = ScriptedPublisher()
         val pipeline = TelegramRelayPipeline(tracker, publisher)
 
@@ -168,6 +169,7 @@ class TelegramRelayPipelineTest {
     @Test
     fun `complete failure retries the same snapshot on the next event`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("key-a")
         val publisher = ScriptedPublisher().apply {
             submittedPerCall = { if (it == 1) 0 else Int.MAX_VALUE }
         }
@@ -185,6 +187,7 @@ class TelegramRelayPipelineTest {
     @Test
     fun `partial failure retries only the missing copies`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("key-a")
         val publisher = ScriptedPublisher().apply {
             submittedPerCall = { if (it == 1) 1 else Int.MAX_VALUE }
         }
@@ -203,6 +206,7 @@ class TelegramRelayPipelineTest {
     @Test
     fun `partial failure plus growth retries missing and new copies together`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("key-a")
         val publisher = ScriptedPublisher().apply {
             submittedPerCall = { if (it == 1) 1 else Int.MAX_VALUE }
         }
@@ -219,6 +223,7 @@ class TelegramRelayPipelineTest {
     @Test
     fun `publish exception counts as complete failure and retries the same snapshot`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("key-a")
         val publisher = ScriptedPublisher().apply { throwOnCall = 1 }
         val pipeline = TelegramRelayPipeline(tracker, publisher)
         val snapshot = listOf(message("one"), message("two"))
@@ -234,6 +239,7 @@ class TelegramRelayPipelineTest {
     @Test
     fun `failed shrink publication does not swallow the rebuilt entry`() {
         val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("key-a")
         val publisher = ScriptedPublisher().apply {
             submittedPerCall = { if (it == 2) 0 else Int.MAX_VALUE }
         }
@@ -292,6 +298,7 @@ class TelegramRelayPipelineTest {
             }
             val pipeline = TelegramRelayPipeline(tracker, publisher)
             if (rebuilt) tracker.markBaseline("chat", List(4) { message("old", time = 1000) })
+            else tracker.forgetDismissedSeries("chat")
             val a = message("A", time = 4000)
             val b = message("B", time = 3000)
             val c = message("C", time = 5000)
@@ -311,7 +318,9 @@ class TelegramRelayPipelineTest {
         val publisher = ScriptedPublisher().apply {
             submittedPerCall = { if (it == 1) 0 else Int.MAX_VALUE }
         }
-        val pipeline = TelegramRelayPipeline(MessageTracker(), publisher)
+        val tracker = MessageTracker()
+        tracker.forgetDismissedSeries("chat")
+        val pipeline = TelegramRelayPipeline(tracker, publisher)
         val original = List(66) { message("entry-$it", time = it.toLong()) }
         val shifted = original.drop(1) + message("appended", time = 66)
 

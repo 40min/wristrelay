@@ -45,13 +45,23 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
 
     private val cursors = LinkedHashMap<String, Cursor>()
 
-    fun newMessages(conversationKey: String, snapshot: List<RelayMessage>): List<RelayMessage> {
-        if (snapshot.isEmpty()) return emptyList()
-        val cursor = cursors[conversationKey] ?: Cursor(0, null)
-        val (start, rebuild) = detectionRange(cursor, snapshot)
-        val positions = freshPositions(snapshot, start, rebuild)
-        if (positions.isEmpty()) remember(conversationKey, snapshot.size, cursor.lastTimestampMs)
-        return positions.map(snapshot::get)
+    fun newMessages(conversationKey: String, snapshot: List<RelayMessage>): List<RelayMessage> = when {
+        snapshot.isEmpty() -> emptyList()
+        cursors[conversationKey] == null && snapshot.size > 1 -> {
+            // With no retained history, a batch may be old unread state after
+            // cursor eviction/restart. Absorb it as a baseline; a single cold
+            // entry remains eligible so the first message is not lost.
+            markBaseline(conversationKey, snapshot)
+            emptyList()
+        }
+        else -> {
+            val knownCursor = cursors[conversationKey]
+            val cursor = knownCursor ?: Cursor(0, null)
+            val (start, rebuild) = detectionRange(cursor, snapshot)
+            val positions = freshPositions(snapshot, start, rebuild)
+            if (positions.isEmpty()) remember(conversationKey, snapshot.size, cursor.lastTimestampMs)
+            positions.map(snapshot::get)
+        }
     }
 
     /**
@@ -125,7 +135,7 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
 
     /** Only our confirmed source dismissal establishes a new snapshot series. */
     fun forgetDismissedSeries(conversationKey: String) {
-        cursors.remove(conversationKey)
+        remember(conversationKey, 0, null)
     }
 
     /**
