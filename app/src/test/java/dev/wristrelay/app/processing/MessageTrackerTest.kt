@@ -71,16 +71,88 @@ class MessageTrackerTest {
     }
 
     @Test
-    fun `shrink resets cursor without emitting old entries`() {
+    fun `timestamped replacement after shrink emits genuinely newer entries`() {
         val tracker = MessageTracker()
         tracker.forgetDismissedSeries(convKey)
-        val three = listOf(message("one"), message("two"), message("three"))
+        val three = listOf(
+            message("one", time = 1000),
+            message("two", time = 2000),
+            message("three", time = 3000),
+        )
         tracker.relay(convKey, three)
         // Source cleared to one entry; nothing emitted.
-        assertEquals(emptyList<Any>(), tracker.relay(convKey, listOf(message("one"))))
-        // New growth beyond one is emitted.
-        val growth = listOf(message("one"), message("fresh-a"), message("fresh-b"))
+        assertEquals(emptyList<Any>(), tracker.relay(convKey, listOf(message("one", time = 1000))))
+        // A same-size rebuilt snapshot is classified by timestamps.
+        val growth = listOf(
+            message("one", time = 1000),
+            message("fresh-a", time = 4000),
+            message("fresh-b", time = 5000),
+        )
         assertEquals(listOf("fresh-a", "fresh-b"), tracker.relay(convKey, growth).map { it.text })
+    }
+
+    @Test
+    fun `silent shrink then restoration preserves extent and emits only appended entry`() {
+        val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
+        val original = listOf(
+            message("A", time = 1000),
+            message("B", time = 2000),
+            message("C", time = 3000),
+        )
+        tracker.relay(convKey, original)
+
+        assertEquals(emptyList<Any>(), tracker.relay(convKey, original.take(1)))
+        assertEquals(emptyList<Any>(), tracker.relay(convKey, original))
+        assertEquals(
+            listOf("D"),
+            tracker.relay(convKey, original + message("D", time = 4000)).map { it.text },
+        )
+    }
+
+    @Test
+    fun `silent shrink then direct append emits only appended entry`() {
+        val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
+        val original = listOf(
+            message("A", time = 1000),
+            message("B", time = 2000),
+            message("C", time = 3000),
+        )
+        tracker.relay(convKey, original)
+
+        assertEquals(emptyList<Any>(), tracker.relay(convKey, original.take(1)))
+        assertEquals(
+            listOf("D"),
+            tracker.relay(convKey, original + message("D", time = 4000)).map { it.text },
+        )
+    }
+
+    @Test
+    fun `growth after silent shrink emits newer entries inside retained extent and retries remainder`() {
+        val tracker = MessageTracker()
+        tracker.forgetDismissedSeries(convKey)
+        val original = listOf(
+            message("A", time = 1000),
+            message("B", time = 2000),
+            message("C", time = 3000),
+        )
+        tracker.relay(convKey, original)
+        assertEquals(emptyList<Any>(), tracker.relay(convKey, original.take(1)))
+
+        val grown = listOf(
+            message("A", time = 1000),
+            message("D", time = 4000),
+            message("E", time = 5000),
+            message("F", time = 6000),
+        )
+        val fresh = tracker.detect(convKey, grown)
+        assertEquals(listOf("D", "E", "F"), fresh.map { it.text })
+        tracker.advanceThroughSubmitted(convKey, grown, fresh, 1)
+        val retry = tracker.detect(convKey, grown)
+        assertEquals(listOf("E", "F"), retry.map { it.text })
+        tracker.advanceThroughSubmitted(convKey, grown, retry, retry.size)
+        assertEquals(emptyList<Any>(), tracker.detect(convKey, grown))
     }
 
     @Test

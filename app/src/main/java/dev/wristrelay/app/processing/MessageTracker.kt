@@ -25,8 +25,9 @@ import dev.wristrelay.app.model.RelayMessage
  *
  * Publication-loss guard (Cf7Lga4n2Sx7): detection does not advance the
  * cursor by itself. Empty detections collapse into the cursor in place
- * (read evidence; no copies are at risk), but a nonempty fresh slice
- * advances the cursor only through the prefix the publisher reports as
+ * (read evidence; no copies are at risk), while a silent shrink retains its
+ * deepest extent until a nonempty rebuilt slice is submitted. A nonempty
+ * fresh slice advances the cursor only through the prefix the publisher reports as
  * successfully submitted ([advanceThroughSubmitted]). A full publication
  * failure therefore retries the same snapshot on the next qualifying
  * event, and a partial failure retries only the missing copies.
@@ -41,6 +42,7 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
         val count: Int,
         val lastTimestampMs: Long?,
         val retry: Retry? = null,
+        val silentShrink: Boolean = false,
     )
 
     private val cursors = LinkedHashMap<String, Cursor>()
@@ -59,7 +61,19 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
             val cursor = knownCursor ?: Cursor(0, null)
             val (start, rebuild) = detectionRange(cursor, snapshot)
             val positions = freshPositions(snapshot, start, rebuild)
-            if (positions.isEmpty()) remember(conversationKey, snapshot.size, cursor.lastTimestampMs)
+            if (positions.isEmpty()) {
+                // A silent shrink is ambiguous: Telegram may restore the old
+                // cumulative array after this smaller snapshot. Keep the
+                // deepest extent so that restoration is not mistaken for
+                // growth. A successful nonempty rebuild still advances to
+                // the actual snapshot extent in advanceThroughSubmitted().
+                remember(
+                    conversationKey,
+                    maxOf(cursor.count, snapshot.size),
+                    cursor.lastTimestampMs,
+                    silentShrink = cursor.silentShrink || snapshot.size < cursor.count,
+                )
+            }
             positions.map(snapshot::get)
         }
     }
@@ -91,6 +105,7 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
             conversationKey, nextPosition,
             maxTimestamp(cursor.lastTimestampMs, fresh.take(submitted)),
             retry,
+            silentShrink = cursor.silentShrink && submitted < positions.size,
         )
     }
 
@@ -98,6 +113,8 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
         val retry = cursor.retry
         return when {
             retry != null -> retryRange(cursor, retry, snapshot)
+            cursor.silentShrink && snapshot.size > cursor.count ->
+                0 to Rebuild(cursor.count, cursor.lastTimestampMs ?: Long.MAX_VALUE)
             snapshot.size > cursor.count -> cursor.count to null
             else -> 0 to Rebuild(snapshot.size, cursor.lastTimestampMs ?: Long.MAX_VALUE)
         }
@@ -154,9 +171,10 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
         size: Int,
         lastTimestampMs: Long?,
         retry: Retry? = null,
+        silentShrink: Boolean = false,
     ) {
         cursors.remove(conversationKey)
-        cursors[conversationKey] = Cursor(size, lastTimestampMs, retry)
+        cursors[conversationKey] = Cursor(size, lastTimestampMs, retry, silentShrink)
         while (cursors.size > maxTrackedConversations) {
             val eldest = cursors.keys.firstOrNull() ?: break
             cursors.remove(eldest)
