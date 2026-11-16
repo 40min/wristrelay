@@ -118,12 +118,19 @@ class RelayNotificationListenerTest {
         mediaSession.release()
     }
 
-    private fun source(time: Long = 1000, summary: Boolean = false, messageTime: Long = time, id: Int = 7): StatusBarNotification {
+    private fun source(
+        time: Long = 1000,
+        summary: Boolean = false,
+        messageTime: Long = time,
+        id: Int = 7,
+        messages: List<Pair<String, Long>> = listOf("OK" to messageTime),
+    ): StatusBarNotification {
         val notification = Notification.Builder(context, "telegram")
             .setSmallIcon(R.drawable.ic_notification)
             .setCategory(Notification.CATEGORY_MESSAGE)
-            .setStyle(Notification.MessagingStyle("Me")
-                .addMessage("OK", messageTime, "Sender"))
+            .setStyle(Notification.MessagingStyle("Me").apply {
+                messages.forEach { (text, timestamp) -> addMessage(text, timestamp, "Sender") }
+            })
             .setGroupSummary(summary).build()
         return StatusBarNotification("org.telegram.messenger", "org.telegram.messenger", id,
             null, 1000, 0, 0, notification, android.os.Process.myUserHandle(), time)
@@ -187,6 +194,59 @@ class RelayNotificationListenerTest {
         listener.onNotificationPosted(fresh)
         assertEquals(1, manager.activeNotifications.size)
         assertTrue(listener.activeNotifications.any { it.key == fresh.key })
+    }
+
+    @Test
+    @Config(sdk = [29, 30, 34])
+    fun `reconnect absorbs overflow and restored history then publishes only the append`() {
+        connect()
+        listener.onListenerDisconnected()
+        // Reconnect with more active conversations than the tracker keeps in its 16-entry baseline.
+        (7..23).forEach { shadowOf(listener).addActiveNotification(source(id = it)) }
+        connect()
+
+        val restored = listOf("OK" to 1000L, "historical" to 2000L)
+        listener.onNotificationPosted(source(time = 2000, messages = restored))
+        assertTrue(manager.activeNotifications.isEmpty())
+
+        listener.onNotificationPosted(source(time = 3000, messages = restored + ("fresh" to 3000L)))
+        val copy = manager.activeNotifications.single()
+        assertEquals("fresh", copy.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+    }
+
+    @Test
+    @Config(sdk = [29, 30, 34])
+    fun `publication denial preserves the original and the same snapshot can recover`() {
+        connect()
+        val original = source()
+        shadowOf(listener).addActiveNotification(original)
+        shadowOf(manager).setNotificationsEnabled(false)
+        listener.onNotificationPosted(original)
+        assertTrue(manager.activeNotifications.isEmpty())
+        assertTrue(listener.activeNotifications.any { it.key == original.key })
+
+        shadowOf(manager).setNotificationsEnabled(true)
+        listener.onNotificationPosted(original)
+        listener.onNotificationPosted(original)
+        assertEquals(1, manager.activeNotifications.size)
+        assertTrue(listener.activeNotifications.any { it.key == original.key })
+
+        confirmCopies()
+        assertTrue(listener.activeNotifications.any { it.key == original.key })
+        assertEquals(1, manager.activeNotifications.size)
+
+        listener.onListenerDisconnected()
+        connect()
+        listener.onNotificationPosted(original)
+        assertEquals(1, manager.activeNotifications.size)
+
+        val fresh = source(time = 2000, id = 8)
+        shadowOf(listener).addActiveNotification(fresh)
+        listener.onNotificationPosted(fresh)
+        confirmCopies()
+        assertTrue(listener.activeNotifications.any { it.key == original.key })
+        assertTrue(listener.activeNotifications.none { it.key == fresh.key })
+        assertEquals(2, manager.activeNotifications.size)
     }
 
     @Test

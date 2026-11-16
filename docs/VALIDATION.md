@@ -238,3 +238,14 @@ Robolectric checks cover default-off timeout, minute/hour conversion and bounds,
 - Change duration and disable auto-clear after posting: old copies keep their assigned timers; future disabled copies do not expire. Telegram originals stay unchanged by expiry.
 - Confirm Reply/Mark as read still removes only the acted-on copy after successful handoff; source removal still leaves relay copies alone.
 - Check the settings and duration dialog in light and dark themes, with large text and on a narrow screen. Cancel or dismiss the dialog after editing and verify the saved duration stays the same. Switch units and verify an exact conversion or an empty field. Turn relay off and verify the duration button is disabled. Verify the permission statuses, Garmin guide and debug controls under Advanced. Empty, zero, negative, fractional, overflowing and out-of-range input must show validation and must not save.
+
+### 2026-11-17 — Telegram delivery across listener state changes
+
+Robolectric passed on API 29, 30, and 34. Reconnecting with 17 active Telegram
+conversations and receiving a restored snapshot produced no historical copies.
+The next append produced exactly one copy with the new message text. After
+publication was refused, retrying the same snapshot produced one copy and kept
+the original. After reconnect, a fresh source was hidden only after its relay
+copy was confirmed active.
+
+Physical Android 29/30 and Garmin delivery for these scenarios remain unverified.
