@@ -7,13 +7,11 @@ import androidx.test.core.app.ApplicationProvider
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -81,17 +79,12 @@ class SettingsStoreTest {
 
     @Test
     fun `observer keeps the synchronous gate aligned`() = runBlocking {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {
             val store = isolatedStore(scope)
-            val expectedSettingsObserved = CompletableDeferred<Unit>()
-            store.observe {
-                SettingsGate.update(it)
-                if (it.masterEnabled && it.telegramEnabled) expectedSettingsObserved.complete(Unit)
-            }
+            store.observe(SettingsGate::update)
             store.save(RelaySettings(masterEnabled = true, telegramEnabled = true))
 
-            withTimeout(2_000) { expectedSettingsObserved.await() }
             assertTrue(SettingsGate.relayingAllowed())
         } finally {
             scope.cancel()
