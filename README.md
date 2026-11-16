@@ -93,3 +93,17 @@ Action cleanup recognizes submitted RemoteInput actions and semantic Mark as rea
 ## Optional auto-clear
 
 **Auto-clear relay notifications** is saved on this device and off by default. With relay on, enable it under **Relay cleanup**, tap **Auto-clear after 60 minutes** (the initial duration), and enter whole minutes or hours. Select **Apply** to save any duration from 1 minute to 7 days. Android schedules expiry separately for each newly posted relay copy, including debug test copies. Changes affect future notifications only: existing copies keep their original timeout, even when the option is disabled. Telegram originals and other copies are untouched. Expiry can remove unread entries and may remove mirrored watch entries; timing and Garmin propagation still need owner device validation. No polling or background timer service is used.
+
+## Spotify notification probe
+
+In a debug build with Notification Access enabled, go to **Advanced → Debug → Start Spotify probe**. Let Spotify play through a track, an ad, and back to music, then return to WristRelay. Look for `other → ad → other` in a single field and note whether that field changes on notification updates or media-session callbacks. The probe checks notification title and text variants, summary, info, ticker and text lines. It also checks media-session title, artist, album and display fields, plus the title, subtitle and description Android derives from the media metadata. A missing token or denied session is shown in the trace.
+
+The probe shows the latest five events live. **Copy Spotify log** copies up to 256 retained events before you stop the probe and clear the trace. Text is classified as `ad` for the exact label “Advertisement” (ignoring case and surrounding whitespace), `contains-ad` for that word within a longer value, `other` or `missing`. The trace stays in memory until cleared or the process ends. This experiment is independent of Telegram relay and does not send notifications to the watch, log media text, or change volume.
+
+## Optional Spotify ad mute
+
+Enable **Spotify → Mute Spotify ads** to temporarily set Android's shared media volume to zero when Spotify's media notification text contains the word `Advertisement`. Other apps using the same media output are also affected. This option is off by default and uses Notification Access independently of the Telegram relay.
+
+WristRelay restores the previous level when the same media notification supplies nonempty text without the marker, Spotify removes the tracked notification, or the one-shot timeout expires. The timeout defaults to 30 seconds and can be set to 1–300 whole seconds for future mutes. Repeated ad updates leave the original deadline in place. Turning the feature off or losing the listener connection also attempts restoration. If media volume is already above zero at restore time, WristRelay leaves it alone.
+
+The timer runs in the WristRelay process and can be delayed while the phone sleeps. If Android kills or force-stops WristRelay before restoration, use the phone's volume buttons to recover. Restore behavior after audio output changes still needs device verification.

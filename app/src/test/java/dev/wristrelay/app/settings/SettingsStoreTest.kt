@@ -59,6 +59,14 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `Spotify ad mute saves independently with a configurable timeout`() = runBlocking {
+        val settings = RelaySettings(spotifyAdMuteEnabled = true, spotifyAdMuteSeconds = 45)
+        val store = isolatedStore()
+        store.save(settings)
+        assertEquals(settings, store.current())
+    }
+
+    @Test
     fun `saving off settings persists off`() = runBlocking {
         val store = isolatedStore()
         store.save(RelaySettings(masterEnabled = true, telegramEnabled = true))

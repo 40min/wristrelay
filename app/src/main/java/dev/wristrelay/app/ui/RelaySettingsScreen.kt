@@ -88,6 +88,7 @@ internal fun RelaySettingsScreen(
             }
         }
     }
+    SpotifyAdMuteSettings(settings, enabled, edit)
     if (editingDuration && relayOn && settings.autoClearEnabled) {
         AutoClearDurationDialog(
             savedMinutes = settings.autoClearMinutes,
@@ -98,6 +99,64 @@ internal fun RelaySettingsScreen(
             },
         )
     }
+}
+
+@Composable
+private fun SpotifyAdMuteSettings(
+    settings: RelaySettings,
+    enabled: Boolean,
+    edit: ((RelaySettings) -> RelaySettings) -> Unit,
+) {
+    var editingTimeout by rememberSaveable { mutableStateOf(false) }
+    SettingsSection("Spotify") {
+        SettingSwitch(
+            "Mute Spotify ads",
+            "Temporarily sets Android media volume to zero, including audio from other apps. " +
+                "Requires Notification Access.",
+            checked = settings.spotifyAdMuteEnabled,
+            enabled = enabled,
+            onCheckedChange = { on -> edit { it.copy(spotifyAdMuteEnabled = on) } },
+        )
+        if (settings.spotifyAdMuteEnabled) {
+            OutlinedButton(onClick = { editingTimeout = true }, enabled = enabled) {
+                Text("Restore after at most ${settings.spotifyAdMuteSeconds} s")
+            }
+        }
+    }
+    if (editingTimeout && settings.spotifyAdMuteEnabled) {
+        SpotifyTimeoutDialog(
+            settings.spotifyAdMuteSeconds,
+            onDismiss = { editingTimeout = false },
+            onApply = { seconds ->
+                editingTimeout = false
+                edit { it.copy(spotifyAdMuteSeconds = seconds) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SpotifyTimeoutDialog(savedSeconds: Int, onDismiss: () -> Unit, onApply: (Int) -> Unit) {
+    var amount by rememberSaveable(savedSeconds) { mutableStateOf(savedSeconds.toString()) }
+    val maximum = RelaySettings.MAX_SPOTIFY_AD_MUTE_SECONDS
+    val seconds = amount.toIntOrNull()?.takeIf { it in 1..maximum }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Spotify mute timeout") },
+        text = {
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Seconds") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                isError = seconds == null,
+                supportingText = { Text("Enter 1–$maximum whole seconds. Applies to future mutes.") },
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(enabled = seconds != null, onClick = { seconds?.let(onApply) }) { Text("Apply") } },
+    )
 }
 
 @Composable

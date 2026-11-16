@@ -36,6 +36,10 @@ class SettingsStore(
             masterEnabled = prefs[MASTER] ?: false,
             telegramEnabled = prefs[TELEGRAM] ?: false,
             hideTelegramOriginals = prefs[HIDE_ORIGINALS] ?: false,
+            spotifyAdMuteEnabled = prefs[SPOTIFY_AD_MUTE] ?: false,
+            spotifyAdMuteSeconds = prefs[SPOTIFY_AD_MUTE_SECONDS]
+                ?.takeIf { it in 1..RelaySettings.MAX_SPOTIFY_AD_MUTE_SECONDS }
+                ?: RelaySettings.DEFAULT_SPOTIFY_AD_MUTE_SECONDS,
             autoClearEnabled = prefs[AUTO_CLEAR] ?: false,
             autoClearMinutes = prefs[AUTO_CLEAR_MINUTES]
                 ?.takeIf { it in 1..RelaySettings.MAX_AUTO_CLEAR_MINUTES } ?: 60,
@@ -46,6 +50,8 @@ class SettingsStore(
 
     suspend fun save(settings: RelaySettings) {
         dataStore.edit { prefs ->
+            prefs[SPOTIFY_AD_MUTE] = settings.spotifyAdMuteEnabled
+            prefs[SPOTIFY_AD_MUTE_SECONDS] = settings.spotifyAdMuteSeconds
             prefs[MASTER] = settings.masterEnabled
             prefs[TELEGRAM] = settings.telegramEnabled
             prefs[HIDE_ORIGINALS] = settings.hideTelegramOriginals
@@ -68,6 +74,8 @@ class SettingsStore(
         val AUTO_CLEAR = booleanPreferencesKey("auto_clear_enabled")
         val AUTO_CLEAR_MINUTES = intPreferencesKey("auto_clear_minutes")
         val HIDE_ORIGINALS = booleanPreferencesKey("hide_telegram_originals")
+        val SPOTIFY_AD_MUTE = booleanPreferencesKey("spotify_ad_mute_enabled")
+        val SPOTIFY_AD_MUTE_SECONDS = intPreferencesKey("spotify_ad_mute_seconds")
         val MASTER = booleanPreferencesKey("master_enabled")
         val TELEGRAM = booleanPreferencesKey("telegram_enabled")
     }
