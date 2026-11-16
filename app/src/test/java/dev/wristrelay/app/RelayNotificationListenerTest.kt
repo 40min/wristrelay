@@ -8,21 +8,22 @@ import android.media.session.MediaSession
 import android.os.Bundle
 import android.os.Looper
 import android.service.notification.StatusBarNotification
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.test.core.app.ApplicationProvider
 import dev.wristrelay.app.debug.DebugEventStore
 import dev.wristrelay.app.debug.DebugFormat
-import dev.wristrelay.app.processing.MessageTracker
-import dev.wristrelay.app.relay.RelayNotificationPublisher
 import dev.wristrelay.app.settings.FaultingSettingsDataStore
 import dev.wristrelay.app.settings.RelaySettings
-import dev.wristrelay.app.settings.SettingsGate
 import dev.wristrelay.app.settings.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,14 +38,45 @@ class RelayNotificationListenerTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val manager get() = context.getSystemService(NotificationManager::class.java)
     private lateinit var listener: RelayNotificationListener
+    private val mainLooper get() = shadowOf(Looper.getMainLooper())
+    private val preferences = MutableStateFlow(relayPreferences(RelaySettings(true, true, true)))
 
     @Before
     fun setUp() {
         listener = Robolectric.buildService(RelayNotificationListener::class.java).create().get()
-        inject("settingsAvailable", true)
-        inject("tracker", MessageTracker())
-        inject("publisher", RelayNotificationPublisher(listener))
-        SettingsGate.update(RelaySettings(true, true, true))
+        listener.openSettings = {
+            SettingsStore(
+                object : DataStore<Preferences> {
+                    override val data = preferences
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                        error("These tests only collect settings")
+                    }
+                },
+                CoroutineScope(Dispatchers.Main),
+            )
+        }
+    }
+
+    @After
+    fun tearDown() {
+        listener.onDestroy()
+    }
+
+    private fun relayPreferences(settings: RelaySettings) = preferencesOf(
+        booleanPreferencesKey("master_enabled") to settings.masterEnabled,
+        booleanPreferencesKey("telegram_enabled") to settings.telegramEnabled,
+        booleanPreferencesKey("hide_telegram_originals") to settings.hideTelegramOriginals,
+    )
+
+    private fun connect() {
+        listener.onListenerConnected()
+        mainLooper.idle()
+    }
+
+    private fun changeSettings(settings: RelaySettings) {
+        preferences.value = relayPreferences(settings)
+        mainLooper.idle()
     }
 
     @Test
@@ -56,14 +88,11 @@ class RelayNotificationListenerTest {
                 booleanPreferencesKey("spotify_ad_mute_enabled") to true,
             ),
         )
-        SettingsGate.update(RelaySettings())
         listener.openSettings = { SettingsStore(dataStore, CoroutineScope(Dispatchers.Main)) }
-        val mainLooper = shadowOf(Looper.getMainLooper())
         val audio = listener.getSystemService(AudioManager::class.java)
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, 5, 0)
 
-        listener.onListenerConnected()
-        mainLooper.idle()
+        connect()
         val mediaSession = MediaSession(context, "test-ad")
         val notification = Notification.Builder(context, "spotify")
             .setSmallIcon(R.drawable.ic_notification)
@@ -89,13 +118,6 @@ class RelayNotificationListenerTest {
         mediaSession.release()
     }
 
-    private fun inject(name: String, value: Any) {
-        RelayNotificationListener::class.java.getDeclaredField(name).apply {
-            isAccessible = true
-            set(listener, value)
-        }
-    }
-
     private fun source(time: Long = 1000, summary: Boolean = false, messageTime: Long = time, id: Int = 7): StatusBarNotification {
         val notification = Notification.Builder(context, "telegram")
             .setSmallIcon(R.drawable.ic_notification)
@@ -118,7 +140,8 @@ class RelayNotificationListenerTest {
     fun `diagnostics require explicit debug capture and retain metadata only`() {
         DebugEventStore.setEnabled(false)
         DebugEventStore.clear()
-        SettingsGate.update(RelaySettings(false, false, false))
+        changeSettings(RelaySettings(false, false, false))
+        connect()
         val original = source()
         original.notification.extras.putCharSequence(Notification.EXTRA_TEXT, "private message")
 
@@ -146,7 +169,29 @@ class RelayNotificationListenerTest {
     }
 
     @Test
+    fun `connection and reconnection baseline active snapshots before publishing new messages`() {
+        val original = source()
+        shadowOf(listener).addActiveNotification(original)
+
+        connect()
+        listener.onNotificationPosted(original)
+        assertTrue(manager.activeNotifications.isEmpty())
+
+        val fresh = source(time = 2000)
+        shadowOf(listener).addActiveNotification(fresh)
+        listener.onNotificationPosted(fresh)
+        assertEquals(1, manager.activeNotifications.size)
+
+        listener.onListenerDisconnected()
+        connect()
+        listener.onNotificationPosted(fresh)
+        assertEquals(1, manager.activeNotifications.size)
+        assertTrue(listener.activeNotifications.any { it.key == fresh.key })
+    }
+
+    @Test
     fun `original waits for own posted confirmation then only original disappears`() {
+        connect()
         val original = source()
         shadowOf(listener).addActiveNotification(original)
         listener.onNotificationPosted(original)
@@ -159,13 +204,14 @@ class RelayNotificationListenerTest {
 
     @Test
     fun `off setting and denied posting never dismiss source`() {
+        connect()
         val original = source()
         shadowOf(listener).addActiveNotification(original)
-        SettingsGate.update(RelaySettings(true, true, false))
+        changeSettings(RelaySettings(true, true, false))
         listener.onNotificationPosted(original)
         confirmCopies()
         assertTrue(listener.activeNotifications.any { it.key == original.key })
-        SettingsGate.update(RelaySettings(true, true, true))
+        changeSettings(RelaySettings(true, true, true))
         shadowOf(manager).setNotificationsEnabled(false)
         listener.onNotificationPosted(source(2000))
         assertTrue(listener.activeNotifications.any { it.key == original.key })
@@ -173,10 +219,11 @@ class RelayNotificationListenerTest {
 
     @Test
     fun `summary and disabled relay do not publish or cancel`() {
+        connect()
         val summary = source(summary = true)
         shadowOf(listener).addActiveNotification(summary)
         listener.onNotificationPosted(summary)
-        SettingsGate.update(RelaySettings(false, false, true))
+        changeSettings(RelaySettings(false, false, true))
         listener.onNotificationPosted(source(2000))
         assertTrue(manager.activeNotifications.isEmpty())
         assertTrue(listener.activeNotifications.any { it.key == summary.key })
@@ -184,6 +231,7 @@ class RelayNotificationListenerTest {
 
     @Test
     fun `own removal allows next identical timestamp message`() {
+        connect()
         val original = source()
         shadowOf(listener).addActiveNotification(original)
         listener.onNotificationPosted(original)
@@ -197,6 +245,7 @@ class RelayNotificationListenerTest {
     }
     @Test
     fun `blocked channel keeps original and publishes nothing`() {
+        connect()
         manager.createNotificationChannel(android.app.NotificationChannel(
             "wristrelay.relayed_messages_silent", "blocked", NotificationManager.IMPORTANCE_NONE,
         ))
@@ -210,6 +259,7 @@ class RelayNotificationListenerTest {
 
     @Test
     fun `failure in another source cancels all pending hiding`() {
+        connect()
         val waiting = source(id = 7)
         shadowOf(listener).addActiveNotification(waiting)
         listener.onNotificationPosted(waiting)
