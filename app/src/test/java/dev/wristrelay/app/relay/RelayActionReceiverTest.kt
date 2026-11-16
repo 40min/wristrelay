@@ -50,7 +50,7 @@ class RelayActionReceiverTest {
         assertTrue(RelayNotificationPublisher(context).publish(
             listOf(RelayMessage(null, false, null, "one"), RelayMessage(null, false, null, "two")),
             source, telegram.packageName,
-        ))
+        ).fullySubmitted)
         return target
     }
 
@@ -74,7 +74,7 @@ class RelayActionReceiverTest {
         assertTrue(RelayNotificationPublisher(context).publish(
             listOf(RelayMessage(null, false, null, "one"), RelayMessage(null, false, null, "two")),
             source, telegram.packageName,
-        ))
+        ).fullySubmitted)
         val originalTokens = listOf(markRead.actionIntent, reply.actionIntent)
         assertTrue(manager.activeNotifications.all { entry ->
             entry.notification.actions.map { it.actionIntent } == originalTokens
@@ -152,6 +152,20 @@ class RelayActionReceiverTest {
         target.send()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(2, manager.activeNotifications.size)
+    }
+
+    @Test
+    fun `sequential publishers keep all copies and handoff cancels only the acted-on one`() {
+        copies()
+        copies()
+        val entries = manager.activeNotifications
+        assertEquals(4, entries.size)
+        // The second publisher instance must not reuse the first one's tag/ID pairs.
+        assertEquals(4, entries.map { it.id }.distinct().size)
+        assertEquals(4, entries.map { it.tag }.distinct().size)
+        invoke(shadowOf(entries[0].notification.actions.single().actionIntent).savedIntent)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(entries.drop(1).map { it.id }, manager.activeNotifications.map { it.id })
     }
 
     @Test

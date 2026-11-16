@@ -166,7 +166,7 @@ class RelayNotificationListener : NotificationListenerService() {
                     TelegramExtractor.TELEGRAM_PACKAGE,
                 )
             is RelayResult.Published -> {
-                queueDismissal(sbn, snapshot?.size, currentPublisher.lastPostedIdentities)
+                queueDismissal(sbn, snapshot?.size, outcome.identities)
                 DebugRecorder.relayTrace(
                     sbn.key,
                     "extracted=${snapshot?.size ?: 0} emitted=${outcome.count} published=${outcome.count}" +
@@ -182,6 +182,13 @@ class RelayNotificationListener : NotificationListenerService() {
                     TelegramExtractor.TELEGRAM_PACKAGE,
                 )
             is RelayResult.Failed -> {
+                // Any failure — including a partially submitted batch —
+                // conservatively suspends original hiding for the rest of
+                // this listener session (README announcement behavior):
+                // submitted copies stay, unsubmitted copies retry on the
+                // next qualifying event for the conversation, and no
+                // Telegram original is dismissed (ADR-014). Reconnect
+                // re-baselines and clears this safety guard.
                 publicationFailed = true
                 pendingDismissals.clear()
                 DebugRecorder.relayTrace(
