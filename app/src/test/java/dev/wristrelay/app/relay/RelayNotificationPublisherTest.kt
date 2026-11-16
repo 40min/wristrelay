@@ -83,6 +83,48 @@ class RelayNotificationPublisherTest {
     }
 
     @Test
+    fun `a new publisher instance never replaces still-active copies`() {
+        publisher.publish(listOf(message(text = "first")))
+        val first = posted().single()
+        RelayNotificationPublisher(context).publish(listOf(message(text = "second")))
+        val posted = posted()
+        val second = posted.single { it.id != first.id }
+        assertEquals(2, posted.size)
+        assertNotEquals(first.tag, second.tag)
+        assertNotEquals(first.id, second.id)
+        assertTrue(second.notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString() == "second")
+    }
+
+    @Test
+    fun `second publisher never reuses an id while the first publication is not yet visible`() {
+        publisher.publish(listOf(message(text = "first")))
+        val first = posted().single()
+        // notify() is asynchronous on a device; a canceled-in-shadow copy stands
+        // in for a second instance whose active-copy scan runs before the first
+        // notify() becomes visible.
+        notificationManager.cancel(first.tag, first.id)
+        assertEquals(0, posted().size)
+        RelayNotificationPublisher(context).publish(listOf(message(text = "second")))
+        val second = posted().single()
+        assertNotEquals(first.id, second.id)
+        assertNotEquals(first.tag, second.tag)
+    }
+
+    @Test
+    fun `identities avoid still-active copies after a simulated process restart`() {
+        publisher.publish(listOf(message(text = "first")))
+        val first = posted().single()
+        // A process death resets the process-wide counter; reconciliation with
+        // active copies must still lift new identities above the survivors.
+        RelayNotificationPublisher.resetIdentitiesForTest()
+        RelayNotificationPublisher(context).publish(listOf(message(text = "second")))
+        val posted = posted()
+        assertEquals(2, posted.size)
+        assertNotEquals(first.id, posted.single { it.id != first.id }.id)
+        assertNotEquals(first.tag, posted.single { it.tag != first.tag }.tag)
+    }
+
+    @Test
     fun `posted notifications are never ongoing or grouped`() {
         publisher.publish(listOf(message(text = "one")))
         val posted = posted()

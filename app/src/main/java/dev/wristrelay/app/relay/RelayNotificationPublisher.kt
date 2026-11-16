@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import androidx.annotation.VisibleForTesting
 import dev.wristrelay.app.settings.RelaySettings
 import dev.wristrelay.app.R
 import dev.wristrelay.app.model.RelayMessage
@@ -22,9 +23,15 @@ fun interface RelayPublisher {
 /**
  * Publishes one independent Android notification per genuinely new message.
  *
- * Identities are unique per publication and never reused while entries are
- * untouched; there is no per-conversation update or replacement (ADR-002) and
- * non-activity source actions dismiss only their originating copy after handoff.
+ * Identities are unique per publication and never reused while a copy is
+ * still active: publisher instances in one process share a process-wide
+ * counter, because notify() is asynchronous and a second publisher may
+ * scan activeNotifications before an earlier copy becomes visible; every
+ * publication additionally starts above any active WristRelay copy so a
+ * reconnected listener or process restart cannot replace an earlier entry
+ * by reallocating the same tag/ID pair. There is no per-conversation update
+ * or replacement (ADR-002) and non-activity source actions dismiss only
+ * their originating copy after handoff.
  *
  * The channel is silent (IMPORTANCE_LOW, no sound): WristRelay entries are
  * duplicated announcements of messages the phone already alerted for, and a
@@ -36,8 +43,6 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
 
     var lastPostedIdentities: List<Pair<String, Int>> = emptyList()
         private set
-
-    private val nextNotificationId = AtomicInteger(FIRST_NOTIFICATION_ID)
 
     override fun publish(messages: List<RelayMessage>): Boolean = publish(messages, null, null)
 
@@ -57,6 +62,7 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
             NotificationManager.IMPORTANCE_NONE
         if (messages.isEmpty() || !postingEnabled || channelBlocked) return false
         checkNotNull(notificationManager)
+        skipActiveIdentities(notificationManager)
         val posted = mutableListOf<Pair<String, Int>>()
 
         messages.forEach { message ->
@@ -88,6 +94,26 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
         }
         lastPostedIdentities = posted.toList()
         return true
+    }
+
+    /**
+     * Publisher instances in one process already share a process-wide counter,
+     * because notify() is asynchronous: a second publisher may read
+     * activeNotifications before the first copy becomes visible and would
+     * otherwise allocate the same tag/ID pair. A process restart resets the
+     * shared counter, so every publication also starts above any still-active
+     * copy (ADR-002).
+     */
+    private fun skipActiveIdentities(notificationManager: NotificationManager) {
+        val highestActive = notificationManager.activeNotifications
+            .filter { it.tag?.startsWith(TAG_PREFIX) == true }
+            .maxOfOrNull { it.id } ?: return
+        if (highestActive >= Int.MAX_VALUE) return
+        while (true) {
+            val current = nextNotificationId.get()
+            if (current > highestActive) return
+            if (nextNotificationId.compareAndSet(current, highestActive + 1)) return
+        }
     }
 
     private fun title(message: RelayMessage): String {
@@ -126,6 +152,19 @@ class RelayNotificationPublisher(private val context: Context) : RelayPublisher 
     companion object {
         /** Starts far above low ids to avoid any collision with system allocations. */
         private const val FIRST_NOTIFICATION_ID = 0x5252_0000
+
+        /**
+         * Shared by every publisher instance in the process: notify() is
+         * asynchronous, so a second publisher whose active-copy scan runs
+         * before an earlier copy becomes visible must still allocate a
+         * fresh identity.
+         */
+        private val nextNotificationId = AtomicInteger(FIRST_NOTIFICATION_ID)
+
+        /** Simulates the process death that resets the counter; tests only. */
+        @VisibleForTesting
+        internal fun resetIdentitiesForTest() = nextNotificationId.set(FIRST_NOTIFICATION_ID)
+
         private const val TAG_PREFIX = "wristrelay-msg-"
         private const val CHANNEL_ID = "wristrelay.relayed_messages_silent"
         private const val FALLBACK_TITLE = "Message"

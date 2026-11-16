@@ -155,6 +155,20 @@ class RelayActionReceiverTest {
     }
 
     @Test
+    fun `sequential publishers keep all copies and handoff cancels only the acted-on one`() {
+        copies()
+        copies()
+        val entries = manager.activeNotifications
+        assertEquals(4, entries.size)
+        // The second publisher instance must not reuse the first one's tag/ID pairs.
+        assertEquals(4, entries.map { it.id }.distinct().size)
+        assertEquals(4, entries.map { it.tag }.distinct().size)
+        invoke(shadowOf(entries[0].notification.actions.single().actionIntent).savedIntent)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(entries.drop(1).map { it.id }, manager.activeNotifications.map { it.id })
+    }
+
+    @Test
     fun `stale wrapper cannot cancel newer copy with reused identity`() {
         copies()
         val old = manager.activeNotifications[0]
