@@ -1,7 +1,10 @@
 package dev.wristrelay.app.debug
 
+import dev.wristrelay.app.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
@@ -9,8 +12,12 @@ class DebugCaptureTest {
 
     @Before
     fun resetStore() {
+        DebugEventStore.setEnabled(false)
         DebugEventStore.clear()
     }
+
+    @After
+    fun cleanUpStore() = resetStore()
 
     private data class EventSpec(
         val seq: Long = 1L,
@@ -35,8 +42,9 @@ class DebugCaptureTest {
 
     @Test
     fun `store is bounded and evicts oldest`() {
+        enableDebugCapture()
         for (seq in 1..(DebugEventStore.MAX_EVENTS + 5)) {
-            DebugEventStore.append(event(EventSpec(seq = seq.toLong())))
+            DebugEventStore.append { event(EventSpec(seq = seq.toLong())) }
         }
         val snapshot = DebugEventStore.snapshot()
         assertEquals(DebugEventStore.MAX_EVENTS, snapshot.size)
@@ -49,18 +57,43 @@ class DebugCaptureTest {
 
     @Test
     fun `clear empties the store`() {
-        DebugEventStore.append(event())
+        enableDebugCapture()
+        DebugEventStore.append { event() }
         DebugEventStore.clear()
         assertEquals(0, DebugEventStore.snapshot().size)
     }
 
     @Test
     fun `snapshot is a defensive copy`() {
-        DebugEventStore.append(event())
+        enableDebugCapture()
+        DebugEventStore.append { event() }
         val snapshot = DebugEventStore.snapshot()
         DebugEventStore.clear()
         assertEquals(1, snapshot.size)
         assertEquals(0, DebugEventStore.snapshot().size)
+    }
+
+    @Test
+    fun `event creation requires debug build and explicit enablement`() {
+        DebugEventStore.append { error("Disabled capture must not create an event") }
+
+        DebugEventStore.setEnabled(true)
+        var created = false
+        DebugEventStore.append {
+            created = true
+            event()
+        }
+        assertEquals(BuildConfig.DEBUG, DebugEventStore.enabled.value)
+        assertEquals(BuildConfig.DEBUG, created)
+
+        DebugEventStore.setEnabled(false)
+        DebugEventStore.append { error("Stopped capture must not create an event") }
+        assertEquals(if (BuildConfig.DEBUG) 1 else 0, DebugEventStore.snapshot().size)
+    }
+
+    private fun enableDebugCapture() {
+        assumeTrue(BuildConfig.DEBUG)
+        DebugEventStore.setEnabled(true)
     }
 
     @Test

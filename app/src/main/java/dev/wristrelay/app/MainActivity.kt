@@ -90,8 +90,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshPermission()
-        captured.clear()
-        captured.addAll(DebugEventStore.snapshot())
+        if (BuildConfig.DEBUG) refreshCapture()
     }
 
     private fun refreshPermission() {
@@ -124,14 +123,15 @@ class MainActivity : ComponentActivity() {
         }) { Text("Send test relay notification") }
         SpotifyProbeSection()
         Text("Debug capture (metadata only)", style = MaterialTheme.typography.titleMedium)
-        Text("Sanitized notification metadata from external apps; no text content, " +
-            "bounded in-memory history (max ${DebugEventStore.MAX_EVENTS}), " +
-            "cleared when the app process dies.")
+        val capturing by DebugEventStore.enabled.collectAsState()
+        Text("Captures notification metadata from external apps while enabled. " +
+            "Keeps up to ${DebugEventStore.MAX_EVENTS} events in memory until cleared or the process ends.")
+        OutlinedButton(onClick = {
+            DebugEventStore.setEnabled(!capturing)
+            refreshCapture()
+        }) { Text(if (capturing) "Stop capture" else "Start capture") }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = {
-                captured.clear()
-                captured.addAll(DebugEventStore.snapshot())
-            }) { Text("Refresh") }
+            OutlinedButton(onClick = ::refreshCapture) { Text("Refresh") }
             OutlinedButton(onClick = {
                 DebugEventStore.clear()
                 captured.clear()
@@ -161,6 +161,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun refreshCapture() {
+        captured.clear()
+        captured.addAll(DebugEventStore.snapshot())
     }
 
     @Composable

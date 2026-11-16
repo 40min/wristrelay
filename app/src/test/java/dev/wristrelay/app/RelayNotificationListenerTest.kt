@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.content.Context
 import android.service.notification.StatusBarNotification
 import androidx.test.core.app.ApplicationProvider
+import dev.wristrelay.app.debug.DebugEventStore
+import dev.wristrelay.app.debug.DebugFormat
 import dev.wristrelay.app.processing.MessageTracker
 import dev.wristrelay.app.relay.RelayNotificationPublisher
 import dev.wristrelay.app.settings.RelaySettings
@@ -56,6 +58,37 @@ class RelayNotificationListenerTest {
         manager.activeNotifications.forEach {
             shadowOf(listener).addActiveNotification(it)
             listener.onNotificationPosted(it)
+        }
+    }
+
+    @Test
+    fun `diagnostics require explicit debug capture and retain metadata only`() {
+        DebugEventStore.setEnabled(false)
+        DebugEventStore.clear()
+        SettingsGate.update(RelaySettings(false, false, false))
+        val original = source()
+        original.notification.extras.putCharSequence(Notification.EXTRA_TEXT, "private message")
+
+        listener.onNotificationPosted(original)
+        assertTrue(DebugEventStore.snapshot().isEmpty())
+        try {
+            DebugEventStore.setEnabled(true)
+            listener.onNotificationPosted(original)
+            DebugEventStore.setEnabled(false)
+            listener.onNotificationPosted(original)
+
+            val events = DebugEventStore.snapshot()
+            assertEquals(if (BuildConfig.DEBUG) 1 else 0, events.size)
+            if (BuildConfig.DEBUG) {
+                val event = events.single()
+                val lines = DebugFormat.format(event)
+                assertEquals(original.key, event.key)
+                assertTrue(lines.any { it.startsWith("extra android.text:") && it.endsWith("len=15") })
+                assertTrue(lines.none { it.contains("private message") || it.contains("Sender") })
+            }
+        } finally {
+            DebugEventStore.setEnabled(false)
+            DebugEventStore.clear()
         }
     }
 

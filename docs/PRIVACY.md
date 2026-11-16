@@ -64,3 +64,7 @@ Settings also store an off-by-default auto-clear boolean and a bounded duration 
 ### Optional Spotify ad mute
 
 The off-by-default Spotify mute option uses Notification Access to inspect the text of Spotify media notifications while enabled. It adds the normal Android `MODIFY_AUDIO_SETTINGS` permission to change shared media volume. Only the enable flag and timeout duration are persisted. The previous volume and timer are process-local. There is no polling, network access, forwarding or persistent Spotify text.
+
+### On-demand diagnostics
+
+Release builds do not record notification diagnostics. In debug builds, capture starts off and must be enabled from Advanced → Debug. While enabled, the recorder collects metadata from external notification events and relay traces. String values are reduced to lengths. The buffer holds up to 200 events in memory and remains available after stopping until cleared or the process ends. The Debug panel can explicitly copy the report to the clipboard.

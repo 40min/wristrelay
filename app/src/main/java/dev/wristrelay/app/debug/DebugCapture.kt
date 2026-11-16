@@ -1,5 +1,9 @@
 package dev.wristrelay.app.debug
 
+import dev.wristrelay.app.BuildConfig
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
  * Metadata-only capture for Task 0.1 device inspection.
  *
@@ -44,30 +48,30 @@ object DebugEventStore {
     const val MAX_EVENTS = 200
 
     private val events = ArrayDeque<DebugEvent>(MAX_EVENTS)
-    private var observer: (() -> Unit)? = null
+    private val enabledState = MutableStateFlow(false)
+    val enabled = enabledState.asStateFlow()
 
-    fun append(event: DebugEvent) {
+    fun setEnabled(enabled: Boolean) {
+        if (!BuildConfig.DEBUG) return
         synchronized(events) {
-            // Bounded history: drop the oldest entry before adding a new one.
-            if (events.size >= MAX_EVENTS) events.removeFirst()
-            events.addLast(event)
+            enabledState.value = enabled
         }
-        observer?.invoke()
+    }
+
+    internal fun append(event: () -> DebugEvent) {
+        if (!BuildConfig.DEBUG) return
+        synchronized(events) {
+            if (!enabledState.value) return
+            val captured = event()
+            if (events.size >= MAX_EVENTS) events.removeFirst()
+            events.addLast(captured)
+        }
     }
 
     fun snapshot(): List<DebugEvent> = synchronized(events) { events.toList() }
 
     fun clear() {
         synchronized(events) { events.clear() }
-        observer?.invoke()
-    }
-
-    fun observe(callback: () -> Unit) {
-        observer = callback
-    }
-
-    fun stopObserving() {
-        observer = null
     }
 }
 
