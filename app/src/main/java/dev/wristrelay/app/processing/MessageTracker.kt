@@ -86,27 +86,35 @@ class MessageTracker(private val maxTrackedConversations: Int = 16) {
 
     private fun detectionRange(cursor: Cursor, snapshot: List<RelayMessage>): Pair<Int, Rebuild?> {
         val retry = cursor.retry
-        if (retry != null) {
-            // The retained suffix can start inside the new array after a small shift,
-            // or straddle its left edge after a larger one.
-            val retainedEnd = retry.offset + retry.timestamps.size
-            for (dropped in (retainedEnd - snapshot.size).coerceAtLeast(0) until retainedEnd) {
-                val oldStart = (dropped - retry.offset).coerceAtLeast(0)
-                val newStart = (retry.offset - dropped).coerceAtLeast(0)
-                val overlap = retry.timestamps.size - oldStart
-                if ((0 until overlap).any {
-                        retry.timestamps[oldStart + it] != snapshot[newStart + it].timestampMs
-                    }
-                ) continue
-                val start = (cursor.count - dropped).coerceAtLeast(0)
-                val rebuild = retry.rebuild?.takeIf { it.size > dropped }
-                    ?.let { Rebuild(it.size - dropped, it.cutoff) }
-                return start to rebuild
-            }
-            return 0 to cursor.lastTimestampMs?.let { Rebuild(snapshot.size, it) }
+        return when {
+            retry != null -> retryRange(cursor, retry, snapshot)
+            snapshot.size > cursor.count -> cursor.count to null
+            else -> 0 to Rebuild(snapshot.size, cursor.lastTimestampMs ?: Long.MAX_VALUE)
         }
-        return if (snapshot.size > cursor.count) cursor.count to null
-        else 0 to Rebuild(snapshot.size, cursor.lastTimestampMs ?: Long.MAX_VALUE)
+    }
+
+    private fun retryRange(
+        cursor: Cursor,
+        retry: Retry,
+        snapshot: List<RelayMessage>,
+    ): Pair<Int, Rebuild?> {
+        // The retained suffix can start inside the new array after a small shift,
+        // or straddle its left edge after a larger one.
+        val retainedEnd = retry.offset + retry.timestamps.size
+        for (dropped in (retainedEnd - snapshot.size).coerceAtLeast(0) until retainedEnd) {
+            val oldStart = (dropped - retry.offset).coerceAtLeast(0)
+            val newStart = (retry.offset - dropped).coerceAtLeast(0)
+            val overlap = retry.timestamps.size - oldStart
+            if ((0 until overlap).any {
+                    retry.timestamps[oldStart + it] != snapshot[newStart + it].timestampMs
+                }
+            ) continue
+            val start = (cursor.count - dropped).coerceAtLeast(0)
+            val rebuild = retry.rebuild?.takeIf { it.size > dropped }
+                ?.let { Rebuild(it.size - dropped, it.cutoff) }
+            return start to rebuild
+        }
+        return 0 to cursor.lastTimestampMs?.let { Rebuild(snapshot.size, it) }
     }
 
     private fun freshPositions(snapshot: List<RelayMessage>, start: Int, rebuild: Rebuild?): List<Int> =

@@ -84,61 +84,65 @@ class RelayNotificationPublisher internal constructor(
         sourcePackage: String?,
         settings: RelaySettings = RelaySettings(),
     ): RelayPublication {
-        if (messages.isEmpty()) return RelayPublication(emptyList(), 0)
-        ensureChannel()
+        if (messages.isNotEmpty()) ensureChannel()
         val notificationManager = context.getSystemService(
             NotificationManager::class.java
         )
         val postingEnabled = notificationManager?.areNotificationsEnabled() == true
         val channelBlocked = notificationManager?.getNotificationChannel(CHANNEL_ID)?.importance ==
             NotificationManager.IMPORTANCE_NONE
-        if (!postingEnabled || channelBlocked) {
-            return RelayPublication.refused(messages.size, "publication not confirmed")
+        if (messages.isEmpty() || !postingEnabled || channelBlocked) {
+            return if (messages.isEmpty()) RelayPublication(emptyList(), 0)
+            else RelayPublication.refused(messages.size, "publication not confirmed")
         }
         checkNotNull(notificationManager)
         skipActiveIdentities(notificationManager)
         val submitted = mutableListOf<Pair<String, Int>>()
-        var failureReason: String? = null
-
-        for (message in messages) {
-            // Stop at the first refusal: already accepted copies are the
-            // submitted prefix; later copies were never attempted and retry
-            // with the next qualifying event (Cf7Lga4n2Sx7).
-            try {
+        val failureReason = try {
+            for (message in messages) {
                 val id = nextNotificationId.getAndIncrement()
-                val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(title(message))
-                    .setContentText(message.text)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(message.text))
-                    .setTimeoutAfter(settings.timeoutMillis)
-                    .setAutoCancel(false)
-                    .setOngoing(false)
-                    .setWhen(System.currentTimeMillis())
-                    .apply {
-                        source?.contentIntent?.takeIf { it.creatorPackage == sourcePackage }?.let {
-                            setContentIntent(it)
-                        }
-
-                    }
-                    .build().apply {
-                        actions = source?.actions?.mapIndexedNotNull { index, action ->
-                            action.takeIf { it.actionIntent?.creatorPackage == sourcePackage }?.let {
-                                RelayActionReceiver.wrap(context, it, sourcePackage, id, index)
-                            }
-                        }?.toTypedArray()
-                    }
-                submit(notificationManager, tagFor(id), id, notification)
-                submitted.add(tagFor(id) to id)
-            } catch (failure: SecurityException) {
-                failureReason = "publish denied: ${failure.javaClass.simpleName}"
-                break
-            } catch (failure: IllegalArgumentException) {
-                failureReason = "publish rejected: ${failure.javaClass.simpleName}"
-                break
+                val tag = tagFor(id)
+                submit(notificationManager, tag, id, buildCopy(message, source, sourcePackage, id, settings))
+                submitted.add(tag to id)
             }
+            null
+        } catch (failure: SecurityException) {
+            "publish denied: ${failure.javaClass.simpleName}"
+        } catch (failure: IllegalArgumentException) {
+            "publish rejected: ${failure.javaClass.simpleName}"
         }
         return RelayPublication(submitted.toList(), messages.size, failureReason)
+    }
+
+    private fun buildCopy(
+        message: RelayMessage,
+        source: Notification?,
+        sourcePackage: String?,
+        id: Int,
+        settings: RelaySettings,
+    ): Notification {
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title(message))
+            .setContentText(message.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message.text))
+            .setTimeoutAfter(settings.timeoutMillis)
+            .setAutoCancel(false)
+            .setOngoing(false)
+            .setWhen(System.currentTimeMillis())
+            .apply {
+                source?.contentIntent?.takeIf { it.creatorPackage == sourcePackage }?.let {
+                    setContentIntent(it)
+                }
+
+            }
+            .build().apply {
+                actions = source?.actions?.mapIndexedNotNull { index, action ->
+                    action.takeIf { it.actionIntent?.creatorPackage == sourcePackage }?.let {
+                        RelayActionReceiver.wrap(context, it, sourcePackage, id, index)
+                    }
+                }?.toTypedArray()
+            }
     }
 
     /**
@@ -153,11 +157,8 @@ class RelayNotificationPublisher internal constructor(
         val highestActive = notificationManager.activeNotifications
             .filter { it.tag?.startsWith(TAG_PREFIX) == true }
             .maxOfOrNull { it.id } ?: return
-        if (highestActive >= Int.MAX_VALUE) return
-        while (true) {
-            val current = nextNotificationId.get()
-            if (current > highestActive) return
-            if (nextNotificationId.compareAndSet(current, highestActive + 1)) return
+        if (highestActive < Int.MAX_VALUE) {
+            nextNotificationId.updateAndGet { maxOf(it, highestActive + 1) }
         }
     }
 
